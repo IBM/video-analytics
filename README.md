@@ -1,13 +1,10 @@
-<!-- This should be the location of the title of the repository, normally the short name -->
-# repo-template
+# video-analytics
 
 <!-- Build Status, is a great thing to have at the top of your repository, it shows that you take your CI/CD as first class citizens -->
 <!-- [![Build Status](https://travis-ci.org/jjasghar/ibm-cloud-cli.svg?branch=master)](https://travis-ci.org/jjasghar/ibm-cloud-cli) -->
 
-<!-- Not always needed, but a scope helps the user understand in a short sentance like below, why this repo exists -->
 ## Scope
-
-The purpose of this project is to provide a template for new open source repositories.
+The purpose of this project is to provide scripts, examples, and code snippets for IBM Video Analytics.
 
 <!-- A more detailed Usage or detailed explaination of the repository here -->
 ## Usage
@@ -67,11 +64,5 @@ If you would like to see the detailed LICENSE click [here](LICENSE).
 # SPDX-License-Identifier: Apache2.0
 #
 ```
-## Authors
-
-Optionally, you may include a list of authors, though this is redundant with the built-in
-GitHub list of contributors.
-
-- Author: New OpenSource IBMer <new-opensource-ibmer@ibm.com>
 
 [issues]: https://github.com/IBM/repo-template/issues/new

@@ -1,3 +1,4 @@
 # MAINTAINERS
 
-Christopher Ferris - chrisfer@us.ibm.com
+Florian Pinel - pinel@us.ibm.com
+Frank Yeh - fyeh@us.ibm.com
