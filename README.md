@@ -15,14 +15,11 @@ This repository contains some example best practices for open source repositorie
 * [README.md](README.md)
 * [CONTRIBUTING.md](CONTRIBUTING.md)
 * [MAINTAINERS.md](MAINTAINERS.md)
-<!-- A Changelog allows you to track major changes and things that happen, https://github.com/github-changelog-generator/github-changelog-generator can help automate the process -->
-* [CHANGELOG.md](CHANGELOG.md)
 
 > These are optional
 
 <!-- The following are OPTIONAL, but strongly suggested to have in your repository. -->
 * [dco.yml](.github/dco.yml) - This enables DCO bot for you, please take a look https://github.com/probot/dco for more details.
-* [travis.yml](.travis.yml) - This is a example `.travis.yml`, please take a look https://docs.travis-ci.com/user/tutorial/ for more details.
 
 These may be copied into a new or existing project to make it easier for developers not on a project team to collaborate.
 
@@ -65,4 +62,4 @@ If you would like to see the detailed LICENSE click [here](LICENSE).
 #
 ```
 
-[issues]: https://github.com/IBM/repo-template/issues/new
+[issues]: https://github.com/IBM/video-analytics/issues/new

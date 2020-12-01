@@ -40,8 +40,7 @@ e.g.
 
 ```
 /*
-Copyright <holder> All Rights Reserved.
-
+Copyright IBM All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 ```
