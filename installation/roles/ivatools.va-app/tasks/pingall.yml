@@ -1,0 +1,118 @@
+---
+############################################################################
+#
+#   Ansible tasks for va-ansible project
+#       used for installing IBM Video Analytics
+#
+#   Tested on 01 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[pingall.yml]: Checking connectivity to a dictionary or list of nodes"
+  set_fact: pf1="[pingall.yml] "
+  tags: always
+  run_once: true
+  delegate_to: localhost
+- name: "{{ pf1 }}Reset dictNodes2Ping Variable"
+  set_fact:
+    dictNodes2Ping: '{{ {} }}'
+  tags: always
+- set_fact:
+    inputType: "{{ nodes_to_ping|type_debug }}"
+  tags: always
+- block:
+  - name: "{{ pf1 }}Copy List input"
+    set_fact:
+      dictNodes2Ping: '{{ dictNodes2Ping|default({})|combine({ item.hostname: item }) }}'
+    loop: "{{ nodes_to_ping|list }}"
+  when: "inputType == 'list'"
+  tags: always
+- block:
+  - name: "{{ pf1 }}Copy Dict input"
+    set_fact:
+      dictNodes2Ping: '{{ nodes_to_ping }}'
+  when: "inputType == 'dict'"
+  tags: always
+- debug:
+    var: dictNodes2Ping
+    verbosity: 1
+- block:
+  - name: "{{ pf1 }}ping to inventory_ipaddr"
+    shell: >
+      ping -c1 -q -n -W 5 {{ item.value.inventory_ipaddr }}
+    register: ping
+    failed_when: false
+    when: 'item.value.inventory_ipaddr is defined'
+    loop: "{{ dictNodes2Ping|dict2items }}"
+  - name: "{{ pf1 }}ping results parsing"
+    set_fact:
+      dictNodes2Ping: "{{ dictNodes2Ping|combine({ item.item.key: item.item.value|combine({ 'pingOK': item.item.value.inventory_ipaddr }) }) }}"
+    when: 'item.changed and item.rc==0'
+    loop: "{{ ping.results }}"
+  tags: always
+- block:
+  - name: "{{ pf1 }}ping to ipv6"
+    shell: >
+      ping -c1 -q -n -W 5 {{ item.value.ipv6 }}
+    register: ping
+    failed_when: false
+    when: 'item.value.ipv6 is defined'
+    loop: "{{ dictNodes2Ping|dict2items }}"
+  - name: "{{ pf1 }}ping results parsing"
+    set_fact:
+      dictNodes2Ping: "{{ dictNodes2Ping|combine({ item.item.key: item.item.value|combine({ 'pingOK': item.item.value.ipv6 }) }) }}"
+    when: 'item.changed and item.rc==0'
+    loop: "{{ ping.results }}"
+  tags: always
+
+- block:
+  - name: "{{ pf1 }}ping to ipv4"
+    shell: >
+      ping -c1 -q -n -W 5 {{ item.value.ipv4 }}
+    register: ping
+    failed_when: false
+    when: 'item.value.ipv4 is defined'
+    loop: "{{ dictNodes2Ping|dict2items }}"
+  - name: "{{ pf1 }}ping results parsing"
+    set_fact:
+      dictNodes2Ping: "{{ dictNodes2Ping|combine({ item.item.key: item.item.value|combine({ 'pingOK': item.item.value.ipv4 }) }) }}"
+    when: 'item.changed and item.rc==0'
+    loop: "{{ ping.results }}"
+  tags: always
+
+- block:
+  - name: "{{ pf1 }}ping to hostname"
+    shell: >
+      ping -c1 -q -n -W 5 {{ item.value.hostname }}
+    register: ping
+    failed_when: false
+    when: 'item.value.hostname is defined'
+    loop: "{{ dictNodes2Ping|dict2items }}"
+  - name: "{{ pf1 }}ping results parsing"
+    set_fact:
+      dictNodes2Ping: "{{ dictNodes2Ping|combine({ item.item.key: item.item.value|combine({ 'pingOK': item.item.value.hostname }) }) }}"
+    when: 'item.changed and item.rc==0'
+    loop: "{{ ping.results }}"
+  tags: always
+- debug:
+    var: dictNodes2Ping
+    verbosity: 2
+
+- block:
+  - name: "{{ pf1 }}Clear result List"
+    set_fact:
+      targetNodes: '{{ []|list }}'
+  - name: "{{ pf1 }}Copy result Set to List"
+    set_fact:
+      targetNodes: '{{ targetNodes|default([]) + [ item.value ] }}'
+    loop: "{{ dictNodes2Ping|dict2items }}"
+  - set_fact:
+      nodes_to_ping: "{{ targetNodes }}"
+  when: "inputType == 'list'"
+  tags: always
+- block:
+  - name: "{{ pf1 }}Copy Dict input"
+    set_fact:
+      nodes_to_ping: '{{ dictNodes2Ping }}'
+  when: "inputType == 'dict'"
+  tags: always

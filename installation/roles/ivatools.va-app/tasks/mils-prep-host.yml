@@ -1,0 +1,60 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics
+#
+#   MILS installer is using hostname -i to get the external ip address but
+#  that address might be set to 127.0.0.1 and MILS installer fails:
+#      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#      The 'hostname -i' command returned 127.0.1.1. This is not a valid ip address as it is unreachable by external hosts.
+#      Please modify the /etc/hosts file and set the ip address for the
+#      vademo00 host to a valid ip address.",
+#      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#
+#   This task is addressing that problem by setting the host ip address to
+#   - The external ip address harvested from ansible_facts
+#   - The docker bridge address if the server is standalone (allinone)
+#
+#   Tested on 02 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[mils-prep-host.yml] Starting"
+  set_fact: pf1="[mils-prep-host.yml] "
+
+- name: "{{ pf1 }}Get hostname -i"
+  command: "hostname -i"
+  register: hostname_i
+- block:
+  - debug:
+      msg: "hostname -i returned {{ hostname_i.stdout }}"
+  - debug:
+      var: ansible_facts.docker0.ipv4.address
+      verbosity: 1
+  - name: "{{ pf1 }}Comment out the hostname mapping to 127.0.something in /etc/hosts"
+    replace:
+      path: /etc/hosts
+      regexp: '^{{ hostname_i.stdout }}'
+      replace: '#{{ hostname_i.stdout }}'
+      backup: yes
+    become: yes
+# This is a mils, so the ip adress will be the one from the docker bridge
+  - name: "{{ pf1 }}Add new hostname mapping in /etc/hosts"
+    blockinfile:
+      path: /etc/hosts
+      marker: "# {mark} VA-ANSIBLE MANAGED BLOCK"
+      insertafter: '^{{ hostname_i.stdout }}'
+      block: "{{ topology.ipv4|default(topology.ipv6)|default(topology.inventory_ipaddr) }}	{{ topology.hostname }}"
+    when: '"mils" in group_names'
+# This is an allinone, so the ip adress will be the one from the docker bridge
+  - name: "{{ pf1 }}Add new hostname mapping in /etc/hosts"
+    blockinfile:
+      path: /etc/hosts
+      marker: "# {mark} VA-ANSIBLE MANAGED BLOCK"
+      insertafter: '^{{ hostname_i.stdout }}'
+      block: "{{ ansible_facts.docker0.ipv4.address|default('#172.17.0.1') }}	{{ topology.hostname }}"
+    when: '"mils" not in group_names'
+    become: yes
+  when: hostname_i.stdout is match("127.0.*")
+  become: yes

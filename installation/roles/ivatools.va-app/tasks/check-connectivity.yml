@@ -1,0 +1,95 @@
+---
+############################################################################
+#
+#   Ansible tasks for va-ansible project
+#       used for installing IBM Video Analytics
+#
+#   These tasks check the connectivity between the different nodes using ping command 
+#   and the topology discovered by parse-technology.yml
+#
+#   Tested on 01 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[check-connectivity.yml]: Checking connectivity"
+  set_fact: pf="[check-connectivity.yml] "
+  tags: always
+  run_once: true
+  delegate_to: localhost
+#
+# Connectivity between SSE and MILS
+#
+- block:
+  - name: "{{ pf }}Set nodes_to_ping=mils_node"
+    set_fact:
+      nodes_to_ping: "{{ {}|combine({ 'mils_node': topology.mils_node|default(omit) }) }}"
+  - block:
+    - name: "{{ pf }}Test ping from SSE Nodes to MILS"
+      include_tasks: pingall.yml
+    - name: "{{ pf }}Set mils_node ping results in topology"
+      set_fact:
+        topology: "{{ topology|combine(nodes_to_ping) }}"
+    - name: "{{ pf }}Fail if mils_node is not accessible"
+      fail:
+        msg: "SSE {{ inventory_hostname }} cannot access the mils server {{ topology.mils_node.hostname }}/{{ topology.mils_node.ipv4|default(topology.mils_node.ipv6|default('')) }}, aborting"
+      when: 'topology.mils_node.pingOK is not defined'
+    when: 'nodes_to_ping|default({})|dict2items|length > 0'
+    any_errors_fatal: true
+  when: 'topology.sse'
+  tags: always
+#
+# Connectivity between SSE and DLE
+#
+- block:
+  - name: "{{ pf }}Set nodes_to_ping=dle_node"
+    set_fact:
+      nodes_to_ping: "{{ {}|combine({ 'dle_node': topology.dle_node|default(omit) }) }}"
+  - block:
+    - name: "{{ pf }}Test ping from SSE Nodes to DLE"
+      include_tasks: pingall.yml
+    - name: "{{ pf }}Set dle_node ping results in topology"
+      set_fact:
+        topology: "{{ topology|combine(nodes_to_ping) }}"
+    - name: "{{ pf }}Fail if dle_node not accessible"
+      fail:
+        msg: "SSE {{ inventory_hostname }}Cannot access the DLE server {{ topology.dle_node.hostname }}/{{ topology.dle_node.ipv4|default(topology.dle_node.ipv6|default('')) }}, aborting"
+      when: 'topology.dle_node.pingOK is not defined'
+    when: 'nodes_to_ping|default({})|dict2items|length > 0'
+    any_errors_fatal: true
+  when: 'topology.sse'
+  tags: always
+#
+# Connectivity between MILS and SSE
+#
+- block:
+  - name: "{{ pf }}Set nodes_to_ping=mils_ext_clients"
+    set_fact:
+      nodes_to_ping: '{{ topology.mils_ext_clients }}'
+  - block:
+    - name: "{{ pf }}Test ping from MILS Nodes to SSE"
+      include_tasks: pingall.yml
+      when: 'nodes_to_ping|default([])|length > 0'
+    - name: "{{ pf }}Set mils_ext_clients ping results in topology"
+      set_fact:
+        topology: "{{ topology|combine({ 'mils_ext_clients': nodes_to_ping }) }}"
+    - debug:
+        var: topology
+    - name: "{{ pf }}Warn if mils_ext_client not accessible"
+      block:
+      - debug:
+          msg: "{{ lookup('template', 'nodeUnresolved.txt').replace('SSE_NODE',item.hostname|default(item.ipv4)).split('\n') }}"
+        changed_when: true
+        when: "item.pingOK is not defined"
+        loop: "{{ topology.mils_ext_clients|default([]) }}"
+      - wait_for:
+          timeout: 5
+        when: "item.pingOK is not defined"
+        loop: "{{ topology.mils_ext_clients|default([]) }}"
+      delegate_to: localhost
+    when: 'nodes_to_ping|default([])|length > 0'
+    any_errors_fatal: true
+  when: 'topology.mils and topology.mils_ext_clients is defined'
+  tags: always
+- debug:
+    var: topology
+    verbosity: 1

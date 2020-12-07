@@ -1,0 +1,64 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.system role installing python3 and pip3
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[python3-pip3.yml] starting"
+  set_fact: pf="[python3-pip3.yml] "
+
+- name: "{{ pf }}Check for Python3"
+  raw: python3 -V
+  changed_when: false
+  failed_when: false
+  register: check_python3
+
+- name: "{{ pf }}Check for Pip3"
+  raw: pip3 -V
+  changed_when: false
+  failed_when: false
+  register: check_pip3
+
+##################################################################################
+# We assume that if the epel repo is installed, all the repositories are enabled
+- block:
+  - name: "{{ pf }}Installing python3 and pip3 packages from RedHat repositories"
+    package:
+      name: rh-python36,libffi-devel,openssl-devel,rh-python36-python-pip
+      state: "present"
+  - name: "{{ pf }}Linking python3 on Power"
+    file:
+      src: '{{ python3_install_folder }}/python3'
+      dest: '/usr/bin/python3'
+      state: link
+      force: no
+  - name: "{{ pf }}Linking pip3 on Power"
+    file:
+      src: '{{ python3_install_folder }}//pip3'
+      dest: '/usr/bin/pip3'
+      state: link
+      force: no
+  when: >
+       ansible_distribution is search("RedHat") and ansible_architecture != 'x86_64' and
+       ( check_python3.rc != 0 or check_pip3.rc != 0 )
+  become: yes
+
+- name: "{{ pf }}Installing python3 and pip3 packages"
+  package:
+    name: python3,python3-pip
+    state: "present"
+  when: >
+      ( ansible_distribution is not search("RedHat") or ansible_architecture == 'x86_64' ) and
+      ( check_python3.rc != 0 or check_pip3.rc != 0 )
+  become: yes
+- name: "{{ pf }}Installing wheel and setuptools required by docker-compose"
+  pip:
+    name:
+      - wheel
+      - setuptools
+    executable: pip3
+  become: yes

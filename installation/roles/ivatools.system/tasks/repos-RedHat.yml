@@ -1,0 +1,46 @@
+---
+############################################################################
+#
+#   Ansible tasks from ivatools.system role configuring RHEL repositories
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[repos-RedHat.yml] starting"
+  set_fact: pf="[repos-RedHat.yml] "
+
+- name: "{{ pf }}Epel repo check"
+  stat:
+    path: /etc/yum.repos.d/epel.repo
+  register: epel_repo
+#  when: ansible_architecture == 'x86_64'
+
+##################################################################################
+# We assume that if the epel repo is installed, all the repositories are enabled
+- name: "{{ pf }}Setup repositories"
+  block:
+  - name: "{{ pf }}Enable optional, extras and rhscl Repositories"
+    rhsm_repository:
+      name:
+        - rhel-*-optional-rpms
+        - rhel-*-extras-rpms
+        - rhel-*rhscl*-rpms
+      state: enabled
+
+  - name: "{{ pf }}Enable codeready-builder Repository"
+    rhsm_repository:
+      name: codeready-builder*'{{ ansible_distribution_major_version }}'-rpms
+      state: enabled
+    when: ansible_distribution_major_version in [ 8 ]
+
+  - name: "{{ pf }}Add EPEL repository"
+    yum_repository:
+      name: epel
+      description: EPEL Repository
+      baseurl: "https://download.fedoraproject.org/pub/epel/$releasever/$basearch/"
+      gpgkey: "https://epel.mirror.constant.com//RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}"
+    when: ansible_architecture == 'x86_64'
+  when: not epel_repo.stat.exists or ansible_architecture != 'x86_64'
+  become: yes

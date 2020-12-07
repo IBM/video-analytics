@@ -1,0 +1,4 @@
+ *****************************************************************
+ *  Cannot find the folder FOLDER
+ *  Assuming that the COMP component is already removed          *
+ *****************************************************************

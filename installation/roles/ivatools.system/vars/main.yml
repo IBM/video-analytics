@@ -1,0 +1,11 @@
+---
+############################################################################
+#
+#   Ansible variables for ivatools.system role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+python3_install_folder: '/opt/rh/rh-python36/root/usr/bin'

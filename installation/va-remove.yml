@@ -1,0 +1,68 @@
+---
+############################################################################
+#
+#   Install IVA on a single machine using ansible playbook
+#
+#   Tested on 04 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: IBM Video Analytics system preparation
+  hosts: all
+#
+# community general is used for managing rhel repositories (rhsm_repository)
+#                     and ufw firewall
+# ansible.posix     is used for managing rhel firewalld
+#
+  gather_facts: yes
+  collections:
+  - ansible.posix
+  vars:
+  tasks:
+  - debug:
+     var: ansible_become_password
+  - name: "Setting ansible_become_password = ansible_password by default"
+    set_fact:
+      ansible_become_password: "{{ ansible_password }}"
+    when: ansible_become_password is not defined
+    tags: always
+  
+- name: IBM Video Analytics SSE Uninstallation
+  hosts:
+  - sse
+  - allinone
+  gather_facts: no
+  vars:
+  tasks:
+  - block:
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: sse-remove
+    tags: sse
+
+- name: IBM Video Analytics DLE Uninstallation
+  hosts:
+  - dle
+  - allinone
+  gather_facts: no
+  vars:
+  tasks:
+  - block:
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: dle-remove.yml
+    tags: dle
+
+- name: IBM Video Analytics MILS Uninstallation
+  hosts:
+  - mils
+  - allinone
+  gather_facts: no
+  vars:
+  tasks:
+  - block:
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: mils-remove
+    tags: mils
+

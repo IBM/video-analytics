@@ -1,0 +1,53 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.nvidia role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[nvidia-driver-{{ ansible_os_family }}.yml] starting"
+  set_fact: pf="[nvidia-driver-{{ ansible_os_family }}.yml] "
+
+- debug:
+   var: nvidia_repos[ ansible_distribution ]
+
+- block:
+###################################################################################
+## We assume that if the nvidia repo file is there the repository was properly added
+  - name: "{{ pf }}Copy pin file"
+    get_url:
+      url: '{{ nvidia_repos[ ansible_distribution ].pin_url }}'
+      dest: '{{ nvidia_repos[ ansible_distribution ].pin_file }}'
+    become: yes
+#  - name: "{{ pf }}Add NVIDIA repo key"
+#    command: >
+#      apt-key adv --fetch-keys {{ nvidia_repos[ ansible_distribution ].key_url }}
+  - name: "{{ pf }}Add NVIDIA repo key"
+    apt_key:
+      url: '{{ nvidia_repos[ ansible_distribution ].key_url }}'
+      state: present
+  - name: "{{ pf }}Add NVIDIA repository into sources list"
+    apt_repository:
+      repo: deb {{ nvidia_repos[ ansible_distribution ].repo_url }} /
+      state: present
+      update_cache: yes
+  - name: "{{ pf }}List NVIDIA Drivers"
+    command: >
+      apt list nvidia-driver-*
+    register: latest_driver
+  - debug:
+      var: (latest_driver.stdout_lines| list | last).split('/')| first
+    register: nvidia_driver_version
+  - name: "{{ pf }}Installing latest driver version: {{ (latest_driver.stdout_lines| list | last).split('/')| first }}"
+    apt:
+      name: "{{ (latest_driver.stdout_lines| list | last).split('/')| first }}"
+      state: present
+  - name: "{{ pf }}Rebooting the system"
+    reboot:
+      reboot_timeout: 600
+      test_command: nvidia-smi
+  become: yes
+

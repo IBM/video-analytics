@@ -1,0 +1,115 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[extract-archive.yml] Selecting, Transfering and Extracting {{ component | upper }} archive"
+  set_fact: pf1="[extract-archive.yml]({{ component }}) "
+- name: "Naming SHA1 signature file"
+  set_fact: sha1filename="{{ software_dir }}/sha1sum.txt"
+
+#
+# Finding the latest archive
+#
+- name: "{{ pf1 }} Discovering software package in folder {{ software_dir }}"
+  shell: >
+    find {{ software_dir }} -iname "*{{ component }}*{{ ansible_architecture }}.tgz"|grep  -v "FR"|grep -v "DEMOGRAPHICS"|grep -v "TRIAL"|sort -r
+  delegate_to: 'localhost'
+  register: archive_reg
+- name: "{{ pf1 }}Software package not in folder {{ software_dir }}"
+  fail:
+    msg: "{{ component }} archive was not found in folder {{ software_dir }}"
+  when: archive_reg.stdout == ""
+  delegate_to: 'localhost'
+- name: "{{ pf1 }}Archive to be processed is: {{ archive_reg.stdout }}"
+  set_fact:
+    archive: "{{ archive_reg.stdout }}"
+  delegate_to: 'localhost'
+#
+# Managing sha1 signatures on the localhost, get existing or create new signature in sha1sum.txt
+#
+- block:
+  - name: "{{ pf1 }}Check if checksum for {{ archive|basename }} is present in {{ software_dir }}/{{ sha1filename }} "
+    command:
+      chdir: "{{ software_dir }}"
+      cmd: grep "{{ archive|basename }}$" {{ sha1filename }}
+    register: checksum_in_file
+    failed_when: false
+  - name: "{{ pf1 }}Extract sha1 signature from {{ sha1filename }}"
+    set_fact:
+      sha1value: "{{ (checksum_in_file.stdout_lines|last).split(' ')|list|first }}"
+    when: checksum_in_file.stdout_lines|length >0
+  - name: "{{ pf1 }}Compute archive checksum on local node for file: {{ archive }}"
+    stat:
+      checksum_algorithm: sha1
+      get_checksum: yes
+      path: "{{ archive }}"
+    register: new_sha1
+    when: sha1value is not defined
+  - name: "{{ pf1 }}Add new sha1 signature to  {{ sha1filename }}"
+    lineinfile:
+      path: "{{ sha1filename }}"
+      regexp: '{{ archive|basename }}$'
+      line: "{{ new_sha1.stat.checksum }}  {{ archive|basename }}"
+      state: present
+      create: yes
+    when: new_sha1.stat is defined
+  - name: "{{ pf1 }}Get sha1 signature"
+    set_fact:
+      sha1value: "{{ new_sha1.stat.checksum }}"
+    when: new_sha1.stat is defined
+  delegate_to: 'localhost'
+  throttle: 1
+##########################################################################################
+#
+# Copy signature and archive
+#
+- name: "{{ pf1 }}Creates temporary folder on target system to store the archive file"
+  file:
+    path: "{{ temp_dir }}"
+    state: directory
+    mode: '0775'
+  failed_when: false
+
+- name: "{{ pf1 }}Copy {{ sha1filename }} on {{ ansible_hostname }}:/{{ temp_dir }}"
+  copy:
+    src: "{{ sha1filename }}"
+    dest: "{{ temp_dir }}"
+- name: "{{ pf1 }}Check signature of existing file before copy"
+  stat:
+    path: "{{ temp_dir }}/{{ archive|basename }}"
+    checksum_algorithm: sha1
+    get_checksum: yes
+  register: remote_archive
+  failed_when: false
+- name: "{{ pf1 }}Copy {{ archive }} on {{ ansible_hostname }}:/{{ temp_dir }}"
+  copy:
+    src: "{{ archive }}"
+    dest: "{{ temp_dir }}"
+    checksum: "{{ sha1value }}"
+  when: remote_archive.stat.checksum|default('') != sha1value
+  
+#
+# Extracting the archive extract folder is watvid_dir for SSE and DLE but not for MILS
+#
+- name: "{{ pf1 }}Creates folder on target system to extract the archive file"
+  file:
+    path: "{{ extract_dir }}"
+    state: directory
+    mode: '0775'
+  failed_when: false
+  become: yes
+- name: "{{ pf1 }}Extract the archive {{ temp_dir }}/{{ archive | basename }} to {{ extract_dir }}"
+  unarchive:
+    src: "{{ temp_dir }}/{{ archive | basename }}"
+    dest: "{{ extract_dir }}"
+    group: root
+    owner: root
+    remote_src: yes
+  become: yes
+

@@ -1,0 +1,53 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for removing IBM Video Analytics MILS
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[mils-remove.yml] Processing MILS commands"
+  set_fact: pf="[mils-remove.yml] "
+
+- set_fact:
+    target_dir: "{{ watvid_dir }}/watvid/mils"
+    cmd_dir: "{{ watvid_dir }}/watvid/mils/scripts"
+    cleaner_script: "{{ watvid_dir }}/watvid/mils/scripts/ivatool-docker-cleanup.sh"
+
+- name: "{{ pf }}Checking if {{ target_dir }} folder exists"
+  stat:
+    path: "{{ target_dir }}"
+  register: install_folder
+  become: yes
+- block:
+  - debug:
+      msg: "{{ lookup('template', './alreadyRemoved.txt').replace('COMP','MILS').replace('FOLDER',target_dir).split('\n') }}"
+    changed_when: true
+  - wait_for:
+      timeout: 2
+  delegate_to: localhost
+  when: not install_folder.stat.exists
+
+- block:
+  - name: "{{ pf }}Stop the mils in order to stop the docker containers"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: ./stop.sh
+    failed_when: false
+  - name: "{{ pf }}Checking presence of {{ cleaner_script }} script"
+    stat:
+      path: "{{ cleaner_script }}"
+    register: cleaner
+  - name: "{{ pf }}Cleaning docker images"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: "{{ cleaner_script }}"
+    when: cleaner.stat.exists
+  - name: "{{ pf }}Cleaning-up the folder {{ target_dir }}"
+    include_tasks: "deletefolder.yml"
+    vars:
+       folder_to_delete: "{{ target_dir }}"
+  when: install_folder.stat.exists
+  become: yes

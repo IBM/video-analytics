@@ -1,0 +1,4 @@
+ *************************************************************************
+ *  MILS {{ inventory_hostname }} cannot access the SSE server SSE_NODE
+ *  As a result, the MILS might refuse any connection from this node
+ *************************************************************************

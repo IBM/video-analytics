@@ -1,0 +1,50 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics
+#
+#   These tasks are modifying the start scripts of MILS to fix external SSE mappings
+#
+#   Tested on 02 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[mils-post-install.yml] Starting"
+  set_fact: pf1="[mils-post-install.yml] "
+
+- debug:
+    var: topology.mils_ext_clients
+    verbosity: 1
+
+- block:
+  - name: "{{ pf1 }}Add external SSE hostname mappings in start.sh"
+    lineinfile:
+      path: "{{ mils_dir }}/scripts/start.sh"
+      insertafter: '^(\s+)--add-host \$hostname:\$ipaddr'
+      firstmatch: yes
+      line: ' --add-host {{ item.hostname }}:{{ item.pingOK }} \'
+#      state: "{{ action.remove|ternary('absent','present','present') }}"
+      state: present
+    loop: "{{ topology.mils_ext_clients|default([])|list }}"
+    ignore_errors: yes
+  - name: "{{ pf1 }}Add external SSE hostname mappings in runMILS.sh"
+    lineinfile:
+      path: "{{ mils_dir }}/scripts/runMILS.sh"
+      insertafter: '^(\s+)--add-host \$hostname:\$ipaddr'
+      firstmatch: yes
+      line: ' --add-host {{ item.hostname }}:{{ item.pingOK }} \'
+      state: present
+    loop: "{{ topology.mils_ext_clients|default([])|list }}"
+    failed_when: false
+  - name: "{{ pf1 }}Add external SSE hostname mappings in reinitMILS.sh"
+    lineinfile:
+      path: "{{ mils_dir }}/scripts/reinitMILS.sh"
+      insertafter: '^(\s+)--add-host \$hostname:\$ipaddr'
+      firstmatch: yes
+      state: present
+      line: ' --add-host {{ item.hostname }}:{{ item.pingOK }} \'
+    loop: "{{ topology.mils_ext_clients|default([])|list }}"
+    failed_when: false
+  when: "topology.mils_ext_clients|length > 0"
+  become: yes

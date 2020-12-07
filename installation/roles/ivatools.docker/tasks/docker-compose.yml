@@ -1,0 +1,59 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.docker role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[docker-compose.yml] starting"
+  set_fact: pf="[docker-compose.yml] "
+
+- name: "{{ pf }}docker-compose version check"
+  raw: docker-compose -v
+  changed_when: false
+  failed_when: false
+  register: check_compose
+  become: yes
+
+- debug:
+    msg: "{{ check_compose.stdout_lines|list|last }}"
+  when: not check_compose.failed and check_compose.rc == 0
+
+- block:
+  - name: "{{ pf }}Installing docker-compose using pip3"
+    pip:
+      name: docker-compose
+      executable: pip3
+  - name: "{{ pf }}Check docker-compose in /usr/local/bin folder"
+    stat:
+      path: "{{ docker_compose_bin }}"
+    register: dc_local_bin
+#  - name: "{{ pf }}Finding docker-compose in /opt"
+#    shell: >
+#       find /opt -name "docker-compose" -exec ln -s '{}' /usr/local/bin/docker-compose ';'
+#    when: not dc_local_bin.stat.exists
+#  - name: "{{ pf }}Check docker-compose in /usr/local/bin folder"
+#    stat:
+#      path: "{{ docker_compose_bin }}"
+#    register: dc_local_bin
+  - name: "{{ pf }}Exit if docker-compose is not installed"
+    fail:
+      msg: docker-compose was not properly installed in /usr/local/bin
+    when: not dc_local_bin.stat.exists
+  - name: "{{ pf }}Check docker-compose binary in /usr/bin"
+    stat:
+      path: /usr/bin/docker-compose
+    register: dc_bin
+
+  - name: "{{ pf }}Linking docker-compose in /usr/bin"
+    file:
+      src: '{{ docker_compose_bin }}'
+      dest: '/usr/bin/docker-compose'
+      state: link
+      force: no
+    when: not dc_bin.stat.exists
+  when: check_compose.failed or check_compose.rc != 0
+  become: yes

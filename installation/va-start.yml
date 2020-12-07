@@ -1,0 +1,102 @@
+---
+############################################################################
+#
+#   Ansible Playbook to start the IVA application
+#
+#   Tested on 04 Dec 2020
+#
+############################################################################
+- name: IBM Video Analytics system
+  hosts: all
+  gather_facts: yes
+  tasks:
+  - name: "Setting ansible_become_password = ansible_password by default"
+    set_fact:
+      ansible_become_password: "{{ ansible_password }}"
+    when: ansible_become_password is not defined
+    tags: always
+
+- name: IBM Video Analytics DLE
+  hosts:
+  - dle
+  - allinone
+  gather_facts: no
+  vars:
+    target_dir: "{{ watvid_dir }}/watvid/dle"
+  tasks:
+  - block:
+    - name: "Start the DLE with default service"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: ./start.sh
+      register: start_output
+      when: dle_service is not defined
+    - name: "Start the DLE with {{ dle_service }} service"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: "./start.sh --service={{ dle_service }}-docker-compose.yml"
+      register: start_output
+      when: dle_service is defined
+    - debug:
+        var: start_output.stdout_lines
+        verbosity: 1
+    - name: "Sleep for 10 seconds before running check"
+      wait_for:
+        timeout: 10
+    - name: "Run check-svc.sh"
+      command:
+        chdir: "{{ target_dir }}/bin"  
+        cmd: ./check-svc.sh
+      register: check_svc
+    - debug:
+        var: check_svc.stdout_lines
+        verbosity: 1
+    tags: dle
+    become: yes
+
+- name: IBM Video Analytics MILS
+  hosts:
+  - mils
+  - allinone
+  gather_facts: no
+  vars:
+    target_dir: "{{ watvid_dir }}/watvid/mils/scripts"
+  tasks:
+  - block:
+    - name: "Start the MILS"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: ./start.sh
+      register: start_output
+    - debug:
+        var: start_output.stdout_lines
+        verbosity: 1
+    tags: mils
+    become: yes
+   
+- name: IBM Video Analytics SSE
+  hosts:
+  - sse
+  - allinone
+  gather_facts: no
+  vars:
+    target_dir: "{{ watvid_dir }}/watvid/sse"
+  tasks:
+  - block:
+    - name: "Start the SSE"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: ./start.sh
+    - name: "Sleep for 5 seconds before running check"
+      wait_for:
+        timeout: 5
+    - name: "Run-check"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: ./run-check.sh
+      register: check_svc
+    - debug:
+        var: check_svc.stdout_lines
+        verbosity: 1
+    tags: sse
+    become: yes

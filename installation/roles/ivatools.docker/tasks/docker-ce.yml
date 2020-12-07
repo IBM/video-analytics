@@ -1,0 +1,56 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.docker-ce role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[docker-ce.yml] starting"
+  set_fact: pf="[docker-ce.yml] "
+
+- block:
+  - debug:
+      msg: "Installing {{ docker_package }} for {{ ansible_os_family }} {{ ansible_distribution_major_version }}/{{ ansible_architecture }}"
+
+  - name: "{{ pf }}Ensure old versions of Docker are not installed."
+    package:
+      name:
+        - docker
+        - docker-common
+        - docker-engine
+        - docker-client
+        - docker-client-latest
+        - docker-common
+        - docker-latest
+        - docker-latest-logrotate
+        - docker-logrotate
+        - docker-engine
+        - container.io
+        - runc
+      state: absent
+
+  - include_tasks: "{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml"
+
+  - name: "{{ pf }}Installing package {{ docker_package }}"
+    package:
+      name: "{{ docker_package }}"
+      state: "present"
+    notify: refresh package facts
+  become: yes
+
+- debug:
+    var: ansible_facts.packages['{{ docker_package }}']
+    verbosity: 3
+
+- name: "{{ pf }}Starting service"
+  service:
+    state: started
+    name: docker
+    enabled: yes
+  become: yes
+
+- name: "{{ pf }}Ensure handlers are notified now"
+  meta: flush_handlers

@@ -1,0 +1,26 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.system role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[tools.yml] Installing system tools"
+  set_fact: pf="[tools.yml] "
+- name: "{{ pf }}Installing package group Development Tools"
+  package:
+    name: "@Development Tools"
+    state: "present"
+  when: ansible_distribution is search("RedHat")
+  become: yes
+
+- name: "{{ pf }}Installing disk and network tools"
+  package:
+    name: ntfs-3g,pv,lvm2,cryptsetup,dstat,nmon,htop,iotop,arp-scan,git,curl,ca-certificates
+    state: "present"
+  become: yes
+
+

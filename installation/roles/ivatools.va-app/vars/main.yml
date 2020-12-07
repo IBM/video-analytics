@@ -1,0 +1,63 @@
+---
+############################################################################
+#
+#   Ansible variables for ivatools.docker-ce role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+docker_images:
+  dle:
+    - "model-optimizer-{{ ansible_architecture }}:latest"
+    - "dlie-{{ ansible_architecture }}:latest"
+
+mils_installer: "installmils.sh"
+
+# The highest matching pattern is applied, must be lower or equal to archive file name
+version_specific:
+  '1.0':
+     cuda_runtime: "10.1"
+     liveproxy:
+       x86_64:  'https://ibm.biz/BdYWXY'
+       ppc64le: 'https://ibm.biz/BdYWXq'
+  '1.0.5.0-533-SSE':
+     liveproxy:
+       x86_64:  'https://ibm.biz/Bdq4RW'
+       ppc64le: 'https://ibm.biz/Bdq4R7'
+  '1.0.6.0':
+     liveproxy:
+       x86_64:  'https://ibm.biz/Bdq9Z3'
+       ppc64le: 'https://ibm.biz/Bdq9ZT'
+
+ports_list:
+  dle:
+    - port: '14001-14002'
+      protocol: 'tcp'
+  mils:
+    - port: '80'
+      protocol: 'tcp'
+    - port: '443'
+      protocol: 'tcp'
+    - port: '1414'
+      protocol: 'tcp'
+    - port: '5432'
+      protocol: 'tcp'
+    - port: '7777'
+      protocol: 'tcp'
+    - port: '9043'
+      protocol: 'tcp'
+    - port: '9060'
+      protocol: 'tcp'
+    - port: '9080'
+      protocol: 'tcp'
+    - port: '9443'
+      protocol: 'tcp'
+  sse:
+    - port: '59993-60000'
+      protocol: 'tcp'
+    - port: '52000-52200'
+      protocol: 'udp'
+    - port: '15947'
+      protocol: 'udp'

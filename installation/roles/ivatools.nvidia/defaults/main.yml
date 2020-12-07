@@ -1,0 +1,11 @@
+---
+############################################################################
+#
+#   Ansible default values for ivatools.nvidia role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+cuda_runtime_version: "{{ va_software.cuda_runtime }}"

@@ -1,0 +1,291 @@
+---
+############################################################################
+#
+#   Ansible tasks for va-ansible project 
+#       used for installing IBM Video Analytics
+#
+#   This task is defining extracting a topology from the inventory file
+#    "topology": {
+#        "dle": true,
+#        "dle_service": {
+#            "hostname": "xxxx",
+#            "ipv4": "999.999.999.999"
+#        },
+#        "hostname": "yyyyy",
+#        "ipv4": "888.888.888.888",
+#        "mils": true,
+#        "mils_ext_clients": [{
+#            "hostname": "zzzzz",
+#            "ipv4": "777.777.777.777",
+#        }],
+#        "mils_node": {
+#            "hostname": "wwwww",
+#            "ipv4": "666.666.666.666"
+#        },
+#        "sse": true
+#    }
+#
+#
+#   Tested on 1 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[parse-topology.yml] starting"
+  set_fact: pf="[parse-topology.yml] "
+  tags: always
+  run_once: true
+  delegate_to: localhost
+- name: "{{ pf }}Gathering facts on all nodes before defining the topology"
+  gather_facts:
+    parallel: no
+  when: ansible_facts is not defined or ansible_facts|dict2items|length == 0
+  tags: always
+- debug:
+    msg: "{{ pf }}Hostid [{{ inventory_hostname }}], Hostname [{{ ansible_facts.hostname }}], Fully Qualified Hostname [{{ ansible_facts.hostnqn }}]"
+
+- debug:
+    var: groups
+    verbosity: 1
+
+- block:
+#
+# MILS systems
+#
+  - debug:
+      msg: "{{ pf }}Found MILS:{{ item }}/{{ hostvars[item].ansible_facts.hostname|default('Unknown') }}"
+      verbosity: 2
+    with_inventory_hostnames:
+    - mils
+  - name: "{{ pf }}Get MILS nodes"
+    set_fact:
+      mils_nodes: >
+        {{ mils_nodes| default({}) |combine({ item: {
+              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address'],
+              'ipv6': (hostvars[item].ansible_facts.ipv6|default(hostvars[item].ansible_facts.default_ipv6)|default(omit))['address']|default(omit),
+              'hostname': hostvars[item].ansible_facts.fqdn|default(hostvars[item].ansible_facts.hostname),
+              'inventory_hostname': item,
+              'dle_node': hostvars[item].dle_node|default(omit)
+        }} ) }}
+    when: hostvars[item].ansible_facts.hostname is defined
+    with_inventory_hostnames:
+    - mils
+  - debug:
+     var: mils_nodes
+     verbosity: 1
+  
+#
+# SSE systems
+#
+  - name: "{{ pf }}Get SSE nodes"
+    set_fact:
+      sse_nodes: >
+        {{ sse_nodes| default({}) |combine({ item: {
+              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address'],
+              'ipv6': (hostvars[item].ansible_facts.ipv6|default(hostvars[item].ansible_facts.default_ipv6))['address']|default(omit),
+              'hostname': hostvars[item].ansible_facts.fqdn|default(hostvars[item].ansible_facts.hostname),
+              'inventory_ipaddr': item|ipaddr|ternary(item|ipaddr,omit,omit),
+              'mils_node': hostvars[item].mils_node|default(omit),
+              'dle_node': hostvars[item].dle_node|default(omit)
+        }} ) }}
+    when: hostvars[item].ansible_facts.hostname is defined
+    with_inventory_hostnames:
+    - sse
+  - debug:
+     var: sse_nodes
+     verbosity: 1
+
+#
+# DLE systems
+#
+  - name: "{{ pf }}Get DLE nodes"
+    set_fact:
+      dle_nodes: >
+        {{ dle_nodes| default({}) |combine({ item: {
+              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address'],
+              'ipv6': (hostvars[item].ansible_facts.ipv6|default(hostvars[item].ansible_facts.default_ipv6))['address']|default(omit),
+              'inventory_ipaddr': item|ipaddr|ternary(item|ipaddr,omit,omit),
+              'hostname': hostvars[item].ansible_facts.fqdn|default(hostvars[item].ansible_facts.hostname)
+        }} ) }}
+    when: hostvars[item].ansible_facts.hostname is defined
+    with_inventory_hostnames:
+    - dle
+  - debug:
+     var: dle_nodes
+     verbosity: 1
+  run_once: true
+  delegate_to: localhost
+  tags: always
+
+#
+# Individual systems configuration
+#
+- block:
+  - name: "{{ pf }}Get overall configuration"
+    set_fact:
+      topology: >
+         {{ topology|default({})|combine({ 
+            'ipv4': (ansible_facts.ipv4|default(ansible_facts.default_ipv4))['address'], 
+            'ipv6': (ansible_facts.ipv6|default(ansible_facts.default_ipv6))['address']|default(omit), 
+            'hostname': ansible_facts.fqdn|default(ansible_facts.hostname),
+            'inventory_ipaddr': inventory_hostname|ipaddr|ternary(inventory_hostname|ipaddr,omit,omit),
+            'mils': inventory_hostname is in groups['mils']|bool,
+            'sse': inventory_hostname is in groups['sse']|bool,
+            'dle': inventory_hostname is in groups['dle']|bool
+           } ) }}
+  - name: "{{ pf }}Set mils_node to itself when MILS and SSE are colocated"
+    set_fact:
+      mils_node: >
+         {{ inventory_hostname|trim }}
+    when: 'topology.sse and mils_node is not defined and topology.mils'
+#
+# MILS has a dependency towards SSEs
+#
+  - name: "{{ pf }}Get SSEs using this MILS"
+    set_fact:
+      mils_clients: >
+         {{ mils_clients|default([]) + [ item.key ] }}
+    when: 'topology.mils|bool and ( ( item.value.mils_node is defined and item.value.mils_node == inventory_hostname ) or ( topology.sse|bool and item.key == inventory_hostname ) )'
+    loop: "{{ sse_nodes| default({}) | dict2items }}"
+  - debug:
+     var: topology
+     verbosity: 2
+  tags: always
+#
+# Default MILS, there must be one and only one
+#
+- block:
+  - name: "{{ pf }}Get Default MILS from unreferenced mils_node"
+    set_fact:
+      default_mils: >
+         {{ default_mils|default([]) + [ item ] }}
+    when: 'hostvars[item].mils_clients is not defined'
+    with_inventory_hostnames:
+    - mils
+  - name: "{{ pf }}Get Default MILS from a single MILS"
+    set_fact:
+      default_mils: >
+         {{ [ mils_nodes.keys()|first ] }}
+    when: 'mils_nodes is defined and mils_nodes.keys()|default([])|length == 1'
+  - debug:
+     msg: "Default MILS is {{ default_mils|default('not defined') }}"
+  - fail:
+      msg: "FATAL ERROR: there are several nodes defined in the [mils] section of the inventory and this is not a supported configuration, aborting."
+    when: default_mils is defined and default_mils|length > 1
+  run_once: true
+  delegate_to: localhost
+  tags: always
+
+- block:
+  - name: "{{ pf }}Check if there is a default MILS and SSE nodes without mils_node defined"
+    fail:
+      msg: "There is no mils_node parameter defined for {{ item.key }}  or a default MILS available, aborting"
+    when: 'topology.mils|bool and defauklt_mils is defined and default_mils|length > 0 and hostvars[item.key].mils_node is not defined'
+    loop: "{{ sse_nodes| default({}) | dict2items }}"
+  - name: "{{ pf }}Set SSE clients in default MILS"
+    set_fact:
+      mils_clients: >
+         {{ mils_clients|default([]) + [ item.key ] }}
+    when: 'topology.mils|bool and hostvars[item.key].mils_node is not defined and inventory_hostname in default_mils'
+    loop: "{{ sse_nodes| default({}) | dict2items }}"
+  - debug:
+      msg: "SSE clients: {{ mils_clients|default('None') }}"
+      verbosity: 2
+    when: 'topology.mils'
+  - name: "{{ pf }}Set mils_node to default MILS for SSEs"
+    set_fact:
+      mils_node: >
+         {{ default_mils|first }}
+    when: 'topology.sse and mils_node is not defined'
+  - name: "{{ pf }}Set mils_ext_clients in MILS topology"
+    set_fact:
+      topology: >
+         {{ topology|combine ({ 'mils_ext_clients': topology.mils_ext_clients|default([]) + [item.value] }) }}
+#         {{ topology|combine ({ 'mils_ext_clients': topology.mils_ext_clients|default({})|combine({ item.value.hostname: item.value}) }) }}
+    when: 'topology.mils and mils_clients is defined and item.key in mils_clients and item.key != inventory_hostname'
+    loop: "{{ sse_nodes| default({}) | dict2items }}"
+  - name: "{{ pf }}Set mils_node in SSE topology"
+    set_fact:
+      topology: >
+         {{ topology|combine ({ 'mils_node': item.value }) }}
+    when: 'topology.sse and mils_node|trim == item.key'
+    loop: "{{ mils_nodes|dict2items }}"
+  delegate_to: localhost
+  tags: always
+#
+# SSE has a dependency towards DLEs
+#
+- block:
+  - name: "{{ pf }}Get DLE used by colocated SSE"
+    set_fact:
+      dle_servers: >
+         {{ dle_servers|default([]) + [ inventory_hostname ] }}
+    when: 'topology.sse|bool and topology.dle|bool'
+  - name: "{{ pf }}Get DLE used by this SSE"
+    set_fact:
+      dle_servers: >
+         {{ dle_servers|default([]) + [ dle_node ] }}
+    when: 'topology.sse|bool and dle_node is defined'
+  - name: "{{ pf }}Collect list of DLE services already used"
+    set_fact:
+      assigned_dles: >
+         {{ assigned_dles|default([]) + [ hostvars[item.key].dle_service ] }}
+    when: 'hostvars[item.key].dle_service is defined and hostvars[item.key].dle_service|length >0'
+    loop: "{{ sse_nodes|default({})|dict2items }}"
+    run_once: true
+  - debug:
+      var: assigned_dles
+      verbosity: 2
+  - name: "{{ pf }}Collect list of All Unassigned DLE services"
+    set_fact:
+      dles: >
+         {{ dles|default([]) + [ item ] }}
+    when: 'assigned_dles|default([])|length > 0 and item not in assigned_dles'
+    with_inventory_hostnames:
+    - dle
+    run_once: true
+  - name: "{{ pf }}Collect list of All DLE services"
+    set_fact:
+      dles: >
+         {{ dles|default([]) + [ item ] }}
+    when: 'assigned_dles|default([])|length > 0'
+    with_inventory_hostnames:
+    - dle
+    run_once: true
+  delegate_to: localhost
+  tags: always
+
+- debug:
+    msg: "Default DLE is {{ dles|default('not defined') }}"
+  tags: always
+#
+# Default DLE, there must be one and only one
+#
+- block:
+  - name: "{{ pf }}Set default DLE service on SSE nodes"
+    set_fact:
+      topology: >
+         {{ topology|combine ({ 'dle_node': item.value }) }}
+    when: 'topology.sse and dles is defined and ((dle_node is defined and dle_node == item.key) or (dle_node is not defined and item.key == dles|first|trim))'
+    loop: "{{ dle_nodes|dict2items }}"
+  delegate_to: localhost
+  tags: always
+
+#
+# All-in-one systems
+#
+- block:
+  - debug:
+      var: group_names
+      verbosity: 1
+  - name: "{{ pf }}Get All-in-ones/MILS environments"
+    set_fact:
+      topology: >
+         {{ topology|combine ({ 'dle_node': { 'hostname': ansible_facts.fqdn|default(ansible_facts.hostname)},
+            'mils_node': { 'hostname': ansible_facts.fqdn|default(ansible_facts.hostname)} ,
+            'mils': true, 'sse': true, 'dle':true }) }}
+    when: 'inventory_hostname is in groups[ "allinone"]' 
+  - name: "{{ pf }}Reporting Topology"
+    debug:
+     var: topology
+  delegate_to: localhost
+  tags: always

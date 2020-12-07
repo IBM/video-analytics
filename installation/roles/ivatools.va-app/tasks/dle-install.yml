@@ -1,0 +1,105 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics DLE
+#
+#   Tested on 03 Dec 2020
+#
+############################################################################
+- name: "[dle-install.yml] Processing DLE commands"
+  set_fact: pf="[dle-install.yml] "
+
+- set_fact:
+    component: "dle"
+    cmd_dir: "{{ watvid_dir }}/watvid/dle"
+    cleaner_script: "{{ watvid_dir }}/watvid/dle/ivatool-docker-cleanup.sh"
+
+- block:
+  - name: "{{ pf }}Installing python packages used by check-svc.sh"
+    pip:
+      name:
+        - colorama
+        - pyyaml
+        - requests
+      executable: pip3
+  become: yes
+#
+# If the DLE target folder exists
+#       - stop the dle if we want to stop or install/remove
+#       - remove the folder if we want to remove or reinstall
+#
+- name: "{{ pf }}Checking if {{ cmd_dir }} folder exists"
+  stat:
+    path: "{{ cmd_dir }}"
+  register: install_folder
+  become: yes
+- block:
+  - debug:
+      msg: "{{ lookup('template', './reinstallError.txt').replace('COMP','DLE ').split('\n') }}"
+  - wait_for:
+      timeout: 5
+  delegate_to: localhost
+  when: install_folder.stat.exists
+
+#
+# extract-archive.yml is using the variables extract_dir and component
+#
+- include_tasks: "extract-archive.yml"
+  vars:
+    extract_dir: "{{ watvid_dir }}"
+  when: not install_folder.stat.exists
+
+- block:
+  - name: "{{ pf }}Opening ports in firewall"
+    include_tasks: firewall.yml
+    vars:
+      ports: "{{ ports_list[component]|list }}"
+
+  - name: "{{ pf }}Collect list of images before installation"
+    command:
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }}"
+    register: images_before_install
+  - name: "{{ pf }}Start the DLE"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: ./start.sh
+      stdin: "                                                  YES"
+    register: start_output
+    when: dle_service is not defined
+  - name: "{{ pf }}Start the DLE with service {{ dle_service }}"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: "./start.sh --service={{ dle_service }}-docker-compose.yml"
+      stdin: "                                                  YES"
+    register: start_output
+    when: dle_service is defined
+  - name: "{{ pf }}Collect list of images after installation"
+    command:
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }} {{ '{{' }}.Repository{{ '}}' }} {{ '{{' }}.Tag{{ '}}' }}"
+    register: images_after_install
+  - name: "{{ pf }}Diff list of new images"
+    set_fact:
+      new_images: "{{ new_images|default([]) + [{ 'id': item.split(' ')[0], 'name': item.split(' ')[1], 'tag': item.split(' ')[2] }]}}"
+    when: item.split(' ')[0] not in images_before_install.stdout_lines
+    with_items: "{{ images_after_install.stdout_lines }}"
+  - name: "{{ pf }}Creating the cleanup script"
+    template:
+      src: ../templates/ivatools-docker-cleanup.sh
+      dest: '{{ cleaner_script }}'
+      owner: root
+      group: root
+      mode: '0755'
+    when: new_images is defined and new_images|length >0
+  - name: "{{ pf }}Sleep for 10 seconds before running check"
+    wait_for:
+      timeout: 10
+  - name: "{{ pf }}Run check-svc.sh"
+    command:
+      chdir: "{{ cmd_dir }}/bin"  
+      cmd: ./check-svc.sh
+    register: check_svc
+  - debug:
+      var: check_svc.stdout_lines
+  when: not install_folder.stat.exists
+  become: yes

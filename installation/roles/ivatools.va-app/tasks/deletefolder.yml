@@ -1,0 +1,41 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics
+#
+#   Deletes a folder by first unmounting any mountpoint in the subfolders
+#   and unlinking symbolic links.
+#
+#   Tested on 03 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[deletefolder.yml] Deletes a folder {{ folder_to_delete }}"
+  set_fact: pf1="[deletefolder.yml] "
+
+- name: "{{ pf1 }}Checking if {{ folder_to_delete }} exists"
+  stat:
+    path: "{{ folder_to_delete }}"
+  register: folder_check
+  become: yes
+- block:
+  - name: "{{ pf1 }}List mounted folders"
+    command: findmnt -l
+    register: list_mounts
+  - name: "{{ pf1 }}Unmount points in {{ folder_to_delete }}"
+    mount:
+      path: '{{ item.split()[0] }}'
+      state: unmounted  
+    when: "item.split()[0] is match(folder_to_delete)"
+    loop: "{{ list_mounts.stdout_lines|default([])|list }}"
+  - name: "{{ pf1 }}Unlink symbolic links in {{ folder_to_delete }}"
+    command:
+      chdir: "{{ folder_to_delete }}"
+      cmd: find . -type l -exec unlink '{}' ';'
+  - name: "{{ pf1 }}Removing the folder {{ folder_to_delete }}"
+    file:
+      state: absent
+      path: "{{ folder_to_delete }}"
+  when: folder_check.stat.exists
+  become: yes

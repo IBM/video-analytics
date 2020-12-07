@@ -1,0 +1,51 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for removing IBM Video Analytics SSE
+#
+#   Tested on 03 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[sse-remove.yml] Removing SSE Software"
+  set_fact: pf="[sse-remove.yml] "
+
+- set_fact:
+    cmd_dir: "{{ watvid_dir }}/watvid/sse"
+    cleaner_script: "{{ watvid_dir }}/watvid/sse/ivatool-docker-cleanup.sh"
+
+- name: "{{ pf }}Checking if {{ cmd_dir }} folder exists"
+  stat:
+    path: "{{ cmd_dir }}"
+  register: install_folder
+  become: yes
+- block:
+  - debug:
+      msg: "{{ lookup('template', './alreadyRemoved.txt').replace('COMP','SSE').replace('FOLDER',cmd_dir).split('\n') }}"
+    changed_when: true
+  - wait_for:
+      timeout: 1
+  delegate_to: localhost
+  when: not install_folder.stat.exists
+
+- block:
+  - name: "{{ pf }}Stop the SSE"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: ./stop.sh
+    failed_when: false
+  - name: "{{ pf }}Checking presence of {{ cleaner_script }} script"
+    stat:
+      path: "{{ cleaner_script }}"
+    register: cleaner
+  - name: "{{ pf }}Cleaning docker images"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: "{{ cleaner_script }}"
+    when: cleaner.stat.exists
+  - include_tasks: "deletefolder.yml"
+    vars:
+       folder_to_delete: "{{ cmd_dir }}"
+  when: install_folder.stat.exists
+  become: yes

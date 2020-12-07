@@ -1,0 +1,4 @@
+ ***********************************************************
+ *  MILS node [NODE] is unreachable                  
+ *  Check your inventory file and remove unnecessary nodes *
+ ***********************************************************

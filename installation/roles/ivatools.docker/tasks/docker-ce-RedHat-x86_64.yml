@@ -1,0 +1,60 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.docker role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml] starting"
+  set_fact: pf="[{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml] "
+
+- name: "{{ pf }}docker repo check"
+  stat:
+    path: /etc/yum.repos.d/{{ docker_package }}.repo
+  register: docker_repo
+
+- debug:
+    var: docker_repo.stat.exists
+
+- block:
+##################################################################################
+# We assume that if the epel repo is installed, all the repositories are enabled
+  - name: "{{ pf }}Add Docker GPG key."
+    rpm_key:
+      key: "https://download.docker.com/linux/centos/gpg"
+      state: present
+
+  - name: "{{ pf }}Add Docker repository"
+    get_url:
+      url: 'https://download.docker.com/linux/{{ (ansible_distribution == "Fedora") | ternary("fedora","centos") }}/{{ docker_package }}.repo'
+      dest: '/etc/yum.repos.d/{{ docker_package }}.repo'
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: "{{ pf }}Fix docker repo"
+    replace:
+      path: '/etc/yum.repos.d/{{ docker_package }}.repo'
+      regexp: '\$releasever'
+      replace: '{{ ansible_distribution_major_version }}'
+  when: ( not docker_repo.stat.exists )
+  become: yes
+
+- block:
+    - name: "{{ pf }}Ensure container-selinux is installed"
+      package:
+        name: container-selinux
+        state: present
+
+    - name: "{{ pf }}Disable container-tools module"
+      command: dnf -y module disable container-tools
+      changed_when: false  
+    - name: "{{ pf }}Ensure containerd.io is installed"
+      package:
+        name: containerd.io
+        state: present
+  when: ansible_distribution_major_version | int == 8
+  become: yes

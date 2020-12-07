@@ -1,0 +1,103 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[mils-install.yml] Processing MILS commands"
+  set_fact: pf="[mils-install.yml] "
+
+- set_fact:
+    component: "mils"
+    cmd_dir: "{{ watvid_dir }}/watvid/mils/scripts"
+    cleaner_script: "{{ watvid_dir }}/watvid/mils/scripts/ivatool-docker-cleanup.sh"
+    extract_dir: "{{ temp_dir }}/mils"
+
+- name: "{{ pf }}Checking if {{ cmd_dir }} folder exists"
+  stat:
+    path: "{{ cmd_dir }}"
+  register: install_folder
+  become: yes
+- block:
+  - debug:
+      msg: "{{ lookup('template', './reinstallError.txt').replace('COMP','MILS').split('\n') }}"
+  - wait_for:
+      timeout: 5
+  delegate_to: localhost
+  when: install_folder.stat.exists
+
+#
+# extract-archive.yml is using the variables extract_dir and component
+#
+- include_tasks: "extract-archive.yml"
+  when: not install_folder.stat.exists
+
+- block:
+  - name: "{{ pf }}Opening ports in firewall"
+    include_tasks: firewall.yml
+    vars:
+      ports: "{{ ports_list[component]|list }}"
+
+  - name: "{{ pf }}Collect list of images before installation"
+    command:
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }}"
+    register: images_before_install
+  - name: "{{ pf }}Find the MILS installer"
+    find:
+      path: "{{ extract_dir }}"
+      patterns: "{{ mils_installer }}" 
+      recurse: yes
+    register: found_installer
+  - name: "{{ pf }}Exit if installer wasn't found"
+    fail:
+      msg: "FATAL ERROR: Cannot find {{ mils_installer }} in folder {{ extract_dir }}"
+    when:  found_installer.failed or found_installer.files|length!=1
+  - debug:
+      var: found_installer
+      verbosity: 2
+  - name: "{{ pf }}Install the MILS using {{ (found_installer.files|last).path  }}"
+    command:
+      chdir: "{{ (found_installer.files|last).path|dirname }}"  
+      cmd: "{{ (found_installer.files|last).path }} {{ watvid_dir }}"
+      stdin: "                                                  YES"
+    register: install_output
+    ignore_errors: true
+  - name: "{{ pf }}Collect list of images after installation"
+    command:
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }} {{ '{{' }}.Repository{{ '}}' }} {{ '{{' }}.Tag{{ '}}' }}"
+    register: images_after_install
+#  - debug:
+#      var: images_after_install.stdout_lines
+  - name: "{{ pf }}Diff list of new images"
+    set_fact:
+      new_images: "{{ new_images|default([]) + [{ 'id': item.split(' ')[0], 'name': item.split(' ')[1], 'tag': item.split(' ')[2] }]}}"
+    when: item.split(' ')[0] not in images_before_install.stdout_lines and item.split(' ')[1] is search("mils") 
+    with_items: "{{ images_after_install.stdout_lines }}"
+  - debug:
+      var: install_output.stdout_lines
+  - name: "{{ pf }}Check if new images were installed"
+    fail:
+      msg: "MILS didn't installed any new docker image, aborting"
+    when: new_images|default([])|list|length == 0
+  - name: "{{ pf }}Template a cleanup script to {{ cleaner_script }}"
+    template:
+      src: templates/ivatools-docker-cleanup.sh
+      dest: '{{ cleaner_script }}'
+      owner: root
+      group: root
+      mode: '0755'
+    when: new_images is defined and new_images|length >0
+  - name: "{{ pf }}Check output of MILS installer"
+    fail:
+      msg: "MILS installer failed, aborting"
+    when: install_output.rc != 0
+  - name: "{{ pf }}Cleaning-up the install folder {{ extract_dir }}"
+    file:
+      state: absent
+      path: "{{ extract_dir }}"
+  when: not install_folder.stat.exists
+  become: yes

@@ -1,0 +1,34 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.nvidia role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[nvidia-driver-{{ ansible_os_family }}.yml] starting"
+  set_fact: pf="[nvidia-driver-{{ ansible_os_family }}.yml] "
+
+- block:
+##################################################################################
+# We assume that if the epel repo is installed, all the repositories are enabled
+  - name: "{{ pf }}Installing kernel headers"
+    yum:
+      name: kernel-devel,kernel-headers
+      state: present
+  - name: "{{ pf }}Add NVIDIA repository"
+    command: >
+      yum-config-manager --add-repo {{ nvidia_repos[ ansible_distribution ].repo_url }}
+  - name: "{{ pf }}Installing latest driver"
+    yum:
+      name: nvidia-driver-latest-dkms
+      state: present
+      update_cache: yes
+  - name: "{{ pf }}Rebooting the system"
+    reboot:
+      reboot_timeout: 600
+      test_command: nvidia-smi
+  become: yes
+

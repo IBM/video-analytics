@@ -1,0 +1,56 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.docker role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: Gather installed packages
+  package_facts:
+    manager: auto
+  when: ansible_facts.packages is not defined
+
+- debug:
+    var: ansible_facts.packages['{{ docker_package }}'][0].version
+  when: ansible_facts.packages[ docker_package ] is defined
+
+#--- Version on RHEL are like 19.03.13 but on Ubuntu are like 5:19.03.12~3-0~ubuntu-bionic
+
+- include_tasks: "{{ docker_package }}.yml"
+  when: >
+        docker_package not in ansible_facts.packages or 
+        ansible_facts.packages[ docker_package ][0].version.split(":") | list | last is version(min_docker_version, "<") 
+
+- name: "Starting docker service"
+  service:
+    state: started
+    name: docker
+    enabled: yes
+  become: yes
+
+- name: "Testing docker"
+  command: docker run --rm hello-world
+  register: docker_check
+  changed_when: false
+  become: yes
+- debug:
+    var: docker_check
+    verbosity: 1
+- name: "Checking docker hello-world"
+  fail:
+    msg: "FATAL ERROR: Docker hello-world failed, {{ docker_package }} is not properly installed, aborting"
+  when: docker_check.rc != 0 or docker_check.stdout is not search("Hello from Docker!")
+
+- name: Ensure user is added to the docker group.
+  user:
+    name: "{{ ansible_env.USER }}"
+    groups: docker
+    append: true
+  become: yes
+
+- include_tasks: "docker-compose.yml"
+
+

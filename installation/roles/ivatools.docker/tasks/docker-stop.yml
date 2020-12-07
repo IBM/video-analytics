@@ -1,0 +1,16 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.docker role 
+#       used for stopping docker
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "Stopping docker service"
+  service:
+    state: stopped
+    name: docker
+    enabled: yes
+  become: yes

@@ -1,0 +1,225 @@
+---
+############################################################################
+#
+#   Install IVA on a single machine using ansible playbook
+#
+#   Tested on 04 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: system-check
+  hosts: all
+  gather_facts: yes
+  vars:
+  tasks:
+  - name: "Setting ansible_become_password = ansible_password by default"
+    set_fact:
+      ansible_become_password: "{{ ansible_password }}"
+    when: ansible_become_password is not defined
+    tags: always
+  
+  - block:
+#
+# Checking/Installing pre-reqs on all nodes
+#
+    - name: Checking Linux Distribution support
+      set_fact:
+        unsupported_distribution: "{{ ansible_distribution }} v{{ ansible_distribution_major_version }} on {{ ansible_architecture }}"
+      when: ansible_distribution not in ['RedHat','Ubuntu']
+    - name: Checking RedHat Distribution support
+      set_fact:
+        unsupported_distribution: "{{ ansible_distribution }} v{{ ansible_distribution_major_version }} on {{ ansible_architecture }}"
+      when: ansible_distribution == "RedHat" and ( ansible_distribution_major_version not in ['7'] or ansible_architecture not in ['x86_64','ppc64le'] )
+    - name: Checking Ubuntu Distribution support
+      set_fact:
+        unsupported_distribution: "{{ ansible_distribution }} v{{ ansible_distribution_version }} ( {{ ansible_distribution_release }} ) on {{ ansible_architecture }}"
+      when: ansible_distribution == "Ubuntu" and ( ansible_distribution_release not in ['bionic','focal'] or ansible_architecture not in ['x86_64'] )
+    - block:
+      - debug:
+          msg: "{{ lookup('template', '../templates/unsupportedDistribution.txt').replace('NODE',inventory_hostname).replace('DISTRO',unsupported_distribution).split('\n') }}"
+        failed_when: true
+      - fail:
+          msg: aborting...
+      when: "unsupported_distribution is defined"
+      delegate_to: localhost
+    tags: always
+#
+# The SSE configuration requires the MILS hostname during installation.
+#     Checking if all MILS servers are accessible
+#     Aborting as well if there are several MILS servers and the SSE doesn't specify which one to use
+#
+  - block:
+    - debug:
+        msg: "{{ lookup('template', '../templates/milsAbsentError.txt').replace('NODE',item).split('\n') }}"
+      changed_when: true
+      when: "'ansible_hostname' not in hostvars[item]"
+      with_inventory_hostnames:
+        - mils
+      tags: sse
+    - fail:
+        msg: aborting...
+      when: "'ansible_hostname' not in hostvars[item] or hostvars[item].unsupported_distribution is defined"
+      with_inventory_hostnames:
+        - all
+      tags: always
+    any_errors_fatal: true
+    run_once: true
+    delegate_to: localhost
+#
+# Parsing the inventory information, discover MILS/SSE and DLE nodes and check if the topology is complete
+#
+  - block:
+    - include_role:
+        name: ivatools.va-app
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: parse-topology
+#
+# Checking connectivity/networking between the different components discovered in the topology
+#
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: check-connectivity
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: log
+    tags:
+     - mils
+     - sse
+     - dle
+
+- name: IVA System Pre-reqs Installation
+  hosts: all
+#
+# community general is used for managing rhel repositories (rhsm_repository)
+#                     and ufw firewall
+# ansible.posix     is used for managing rhel firewalld
+#
+  gather_facts: no
+  collections:
+  - community.general
+  - ansible.posix
+  vars:
+  tasks:
+#
+# Prevent RHEL PackageKit to lock the yum package manager
+#
+  - block:
+    - name: Gather installed packages, to check if packagekit is present
+      package_facts:
+        manager: auto
+      when: ansible_facts.packages is not defined
+    - name: Ensure PackageKit is stopped during installation
+      service:
+        name: packagekit
+        state: "stopped"
+        enabled: yes
+      become: yes
+      ignore_errors: yes
+      when: ansible_facts.packages[ 'packagekit' ] is defined or ansible_facts.packages[ 'gnome-packagekit' ] is defined
+    when: ansible_os_family == 'RedHat'
+    tags:
+      - sys
+      - docker
+      - tools
+      - nvidiadriver
+      - nvidiaruntime
+      
+  - block:
+    - name: Checking configured Software Directory (software_dir)
+      command: >
+          find {{ software_dir }} -iname '*.tgz'
+      changed_when: false
+      run_once: true
+      delegate_to: 'localhost'
+    - name: Create target folder for IVA software installation
+      file:
+        path: "{{ software_dir }}"
+        state: directory
+        mode: '0755'
+      become: yes
+    tags:
+      - mils
+      - sse
+      - dle
+
+  - block:
+    - include_role:
+        name: ivatools.system
+    tags:
+     - sys
+  - block:
+    - include_role:
+        name: ivatools.system
+        tasks_from: tools
+    tags:
+     - tools
+  - block:
+    - include_role:
+        name: ivatools.docker
+    tags:
+     - docker
+
+- name: IBM Video Analytics DLE Installation
+  hosts:
+  - dle
+  - allinone
+  vars:
+  tasks:
+  - block:
+    - include_role:
+        name: ivatools.nvidia
+        tasks_from: nvidia-driver
+    tags:
+      - nvidiadriver
+  - block:
+    - include_role:
+        name: ivatools.nvidia
+        tasks_from: nvidia-docker-runtime
+    tags:
+      - nvidiaruntime
+  - block:
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: dle-install
+    tags:
+      - dle
+  - block:
+    - include_role:
+        name: ivatools.nvidia
+        tasks_from: nvtop
+    tags:
+      - tools
+
+- name: IBM Video Analytics MILS Installation
+  hosts:
+  - mils
+  - allinone
+  vars:
+  tasks:
+  - block:
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: mils-prep-host
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: mils-install
+    tags:
+      - mils
+  - block:
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: mils-post-install
+    tags:
+      - sse
+
+- name: IBM Video Analytics SSE Installation
+  hosts:
+  - sse
+  - allinone
+  tags: sse
+  vars:
+  tasks:
+  - include_role:
+      name: ivatools.va-app
+      tasks_from: sse-install

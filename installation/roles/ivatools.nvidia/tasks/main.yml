@@ -1,0 +1,21 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.nvidia role 
+#       used for installing IBM Video Analytics DLE
+#
+#   Tested on 28 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: Gather installed packages
+  package_facts:
+    manager: auto
+  when: ansible_facts.packages is not defined
+
+- include_tasks: "nvidia-driver.yml"
+
+- include_tasks: "nvidia-docker.yml"
+
+- include_tasks: "nvtop.yml"
+

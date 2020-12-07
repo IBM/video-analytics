@@ -1,0 +1,10 @@
+---
+############################################################################
+#
+#   Ansible default values for ivatools.system role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################

@@ -1,0 +1,66 @@
+---
+############################################################################
+#
+#   Ansible variables for ivatools.docker-ce role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+# NVIDIA driver and nvidia-docker
+dist_major_minor: '{{ ansible_distribution | lower | replace("redhat","rhel")}}{{ ansible_distribution_version }}'
+dist_majorminor: '{{ dist_major_minor |replace(".","")}}'
+dist_major: '{{ ansible_distribution | lower | replace("redhat","rhel") }}{{ ansible_distribution_major_version }}'
+driver_repo_url_template: 'http://developer.download.nvidia.com/compute/cuda/repos/REPO/{{ ansible_architecture }}'
+nvidia_docker_repo_url_template: 'https://nvidia.github.io/nvidia-container-runtime/REPO'
+
+nvidia_repos:
+  RedHat:
+    repo_url: '{{ driver_repo_url_template.replace("REPO",dist_major) }}/cuda-{{ dist_major }}.repo'
+    repo_file: '/etc/yum.repos.d/nvidia-driver.repo'
+    nvidia_docker_repo_url: '{{ nvidia_docker_repo_url_template.replace("REPO",dist_major_minor) }}/nvidia-container-runtime.repo'
+    nvidia_docker_repo_file: '/etc/yum.repos.d/nvidia-container-runtime.repo'
+    nvidia_docker_packages: 
+     - 'nvidia-container-toolkit'
+     - 'nvidia-container-runtime'
+#      - "{{ [ ansible_architecture ] | map('extract', { 'ppc64le': 'nvidia-container-hook', 'x86_64': 'nvidia-container-toolkit' } )|list | last }}"
+  CentOS:
+    repo_url: '{{ driver_repo_url_template.replace("REPO",dist_major) }}/cuda-{{ dist_major }}.repo'
+    repo_file: '/etc/yum.repos.d/nvidia-driver.repo'
+    nvidia_docker_repo_url: '{{ nvidia_docker_repo_url_template.replace("REPO",dist_major) }}/nvidia-container-runtime.repo'
+    nvidia_docker_repo_file: '/etc/yum.repos.d/nvidia-container-runtime.repo'
+    nvidia_docker_packages:
+     - 'nvidia-docker2'
+  Fedora:
+    repo_url: '{{ driver_repo_url_template.replace("REPO",dist_major) }}/cuda-{{ dist_major }}.repo'
+    repo_file: '/etc/yum.repos.d/nvidia-driver.repo'
+  Debian:
+    repo_url: '{{ driver_repo_url_template.replace("REPO",dist_major) }}/'
+    pin_url: '{{ driver_repo_url_template.replace("REPO",dist_major) }}/cuda-{{ dist_major }}.pin'
+    key_url: '{{ driver_repo_url_template.replace("REPO",dist_major) }}/7fa2af80.pub'
+    pin_file: '/etc/apt/preferences.d/cuda-repository-pin-600'
+    nvidia_docker_repo_url: '{{ nvidia_docker_repo_url_template.replace("REPO",dist_major_minor) }}/nvidia-container-runtime.list'
+    nvidia_docker_repo_file: '/etc/apt/sources.list.d/nvidia-docker.list'
+    nvidia_docker_packages:
+     - 'nvidia-docker2'
+  Ubuntu:
+    repo_url: '{{ driver_repo_url_template.replace("REPO",dist_majorminor) }}/'
+    pin_url: '{{ driver_repo_url_template.replace("REPO",dist_majorminor) }}/cuda-{{ dist_majorminor }}.pin'
+    key_url: '{{ driver_repo_url_template.replace("REPO",dist_majorminor) }}/7fa2af80.pub'
+    pin_file: '/etc/apt/preferences.d/cuda-repository-pin-600'
+    nvidia_docker_repo_url: '{{ nvidia_docker_repo_url_template.replace("REPO",dist_major_minor) }}/nvidia-docker.list'
+    nvidia_docker_repo_file: '/etc/apt/sources.list.d/nvidia-docker.list'
+    nvidia_docker_packages:
+     - 'nvidia-docker2'
+
+#NVIDIA docker only
+nvidia_cuda_runtime:
+  ppc64le:
+    docker_image: 'nvidia/cuda-ppc64le:{{ cuda_runtime_version }}-runtime-ubuntu18.04'
+    cache_file: 'nvidia-cuda-ppc64le-{{ cuda_runtime_version }}-runtime.tar.gz'
+  x86_64:
+    docker_image: 'nvidia/cuda:{{ cuda_runtime_version }}-runtime-ubuntu18.04'
+    cache_file: '/nvidia-cuda-x86_64-{{ cuda_runtime_version }}-runtime.tar.gz'
+
+docker_daemon_json: '/etc/docker/daemon.json'

@@ -1,0 +1,15 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[mils-reinstall.yml] Re-Installing MILS"
+  set_fact: pf3="[mils-reinstall.yml] "
+
+- include_tasks: "mils-remove.yml"
+- include_tasks: "mils-install.yml"

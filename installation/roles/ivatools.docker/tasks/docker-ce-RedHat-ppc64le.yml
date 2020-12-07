@@ -1,0 +1,44 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.docker role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml] starting"
+  set_fact: pf="[{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml] "
+
+- name: "{{ pf }}Ensure old versions of Docker are not installed"
+  package:
+    name:
+      - docker
+      - docker-common
+      - docker-engine
+    state: absent
+
+- name: "{{ pf }}Template a repo file to {{ docker_RedHat_repo }}"
+  template:
+    src: templates/docker-ce.repo.ppc64le
+    dest: '{{ docker_RedHat_repo }}'
+    owner: root
+    group: root
+    mode: '0644'
+
+- block:
+    - name: "{{ pf }}Ensure container-selinux is installed"
+      package:
+        name: container-selinux
+        state: present
+
+    - name: "{{ pf }}Disable container-tools module"
+      command: dnf -y module disable container-tools
+      changed_when: false
+
+    - name: "{{ pf }}Ensure containerd.io is installed"
+      package:
+        name: containerd.io
+        state: present
+  when: ansible_distribution_major_version | int == 8

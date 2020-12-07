@@ -1,0 +1,35 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.system role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: Gather installed packages
+  package_facts:
+    manager: auto
+  when: ansible_facts.packages is not defined
+
+- include_tasks: "repos-RedHat.yml"
+  when: ansible_distribution is search("RedHat")
+
+- include_tasks: "python3-pip3.yml"
+
+- name: "Installing Extra packages on RedHat"
+  package:
+    name: device-mapper-persistent-data,yum-utils, openssl11, openssl11-devel
+    state: "present"
+  when: ansible_distribution is search("RedHat")
+  become: yes
+
+- name: "Installing Extra packages on Ubuntu"
+  package:
+    name: net-tools,apt-transport-https,software-properties-common
+    state: "present"
+  when: ansible_distribution is search("Ubuntu")
+  become: yes
+
+

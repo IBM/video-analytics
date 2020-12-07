@@ -1,0 +1,16 @@
+---
+############################################################################
+#
+#   Ansible handlers for ivatools.nvidia role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+#- name: restart docker
+#  service: "name=docker state=restarted enabled=yes"
+#  become: yes
+- name: refresh package facts
+  package_facts:
+    manager: auto

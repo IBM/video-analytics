@@ -1,0 +1,134 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics SSE
+#
+#   Tested on 03 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[sse-install.yml] Installing SSE software"
+  set_fact: pf="[sse-install.yml] "
+
+- set_fact:
+    component: 'sse'
+    cmd_dir: "{{ watvid_dir }}/watvid/sse"
+    liveproxy_archive: "{{ watvid_dir }}/watvid/sse/liveproxy.tgz"
+    cleaner_script: "{{ watvid_dir }}/watvid/sse/ivatool-docker-cleanup.sh"
+
+- name: "{{ pf }}Checking if {{ cmd_dir }} folder exists"
+  stat:
+    path: "{{ cmd_dir }}"
+  register: install_folder
+  become: yes
+- block:
+  - debug:
+      msg: "{{ lookup('template', './reinstallError.txt').replace('COMP','SSE').split('\n') }}"
+  - wait_for:
+      timeout: 5
+  delegate_to: localhost
+  when: install_folder.stat.exists
+
+#
+# extract-archive.yml is using the variables extract_dir and component_selected
+#
+- include_tasks: "extract-archive.yml"
+  vars:
+    extract_dir: "{{ watvid_dir }}"
+  when: not install_folder.stat.exists
+
+- block:
+  - name: "{{ pf }}Opening ports in firewall"
+    include_tasks: firewall.yml
+    vars:
+      ports: "{{ ports_list[component]|list }}"
+
+  - debug:
+      msg: "DLE service: {{ topology.dle_node }}"
+  - debug:
+      msg: "MILS service: {{ topology.mils_node }}"
+  - name: "{{ pf }}Set dle-ip"
+    set_fact:
+      dle_ip: "--dle-ip={{ topology.dle_node.pingOk|default(topology.dle_node.ipv4)|default(topology.dle_node.hostname) }}"
+    when: "topology.dle_node is defined"
+  - name: "{{ pf }} ./sseconfig.sh {{ dle_ip|default('') }} vfi={{ vfi|default('no')}}"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: "./sseconfig.sh {{ dle_ip|default('') }} vfi={{ vfi|default('no')}}"
+  - name: "{{ pf }}Collect list of images before installation"
+    command:
+      chdir: "{{ cmd_dir }}"
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }}"
+    register: images_before_install
+  - name: "{{ pf }}Load the SSE"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: ./start.sh --load
+      stdin: "                                                  YES"
+    register: start_output
+  - name: "{{ pf }}Set mils-ip"
+    set_fact:
+      mils_ip: "{{ topology.mils_node.pingOk|default(topology.mils_node.ipv4)|default(topology.mils_node.hostname) }}"
+  - name: "{{ pf }} ./store-credentials.sh https://{{ mils_ip }} ibmsse <default password>"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: "./store-credentials.sh https://{{ mils_ip }} ibmsse WATVIDP@ssw0rd"
+  - name: "{{ pf }}Download {{ va_software.liveproxy }}"
+    get_url:
+      url: '{{ va_software.liveproxy }}'
+      dest: '{{ liveproxy_archive }}'
+#  - name: "{{ pf }}Download {{ va_software.liveproxy }}"
+#    command:
+#      chdir: "{{ cmd_dir }}"
+#      cmd: 'wget -O {{ liveproxy_archive }} {{ va_software.liveproxy }}'
+  - name: "{{ pf }}Uncompress liveproxy lib"
+    unarchive:
+      src: "{{ liveproxy_archive }}"
+      dest: "{{ cmd_dir }}"
+      group: root
+      owner: root
+      remote_src: yes
+  - name: "{{ pf }}Load the liveproxy in the docker image"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: ./start.sh --liveproxy
+  - name: "{{ pf }}Restart the docker container"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: ./restart.sh
+  - name: "{{ pf }}Collect list of images after installation"
+    command:
+      chdir: "{{ cmd_dir }}"
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }} {{ '{{' }}.Repository{{ '}}' }} {{ '{{' }}.Tag{{ '}}' }}"
+    register: images_after_install
+#  - debug:
+#      var: images_after_install.stdout_lines
+  - name: "{{ pf }}Diff list of new images"
+    set_fact:
+      new_images: "{{ new_images|default([]) + [{ 'id': item.split(' ')[0], 'name': item.split(' ')[1], 'tag': item.split(' ')[2] }]}}"
+    when: item.split(' ')[0] not in images_before_install.stdout_lines
+    with_items: "{{ images_after_install.stdout_lines }}"
+#  - debug:
+#      var: new_images
+  - name: "{{ pf }}Creating the cleanup script"
+    template:
+      src: templates/ivatools-docker-cleanup.sh
+      dest: '{{ cleaner_script }}'
+      owner: root
+      group: root
+      mode: '0755'
+    when: new_images is defined and new_images|length >0
+  - name: "{{ pf }}Sleep for 5 seconds before running check"
+    wait_for:
+      timeout: 5
+  - name: "{{ pf }}Run check-svc.sh"
+    command:
+      chdir: "{{ cmd_dir }}"  
+      cmd: ./run-check.sh
+    register: check_svc
+  - debug:
+      var: check_svc.stdout_lines
+  when: not install_folder.stat.exists
+  become: yes
+

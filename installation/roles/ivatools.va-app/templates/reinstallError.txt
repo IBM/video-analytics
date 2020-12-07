@@ -1,0 +1,4 @@
+ **********************************************************************
+ *  COMP won't be installed as there is already a COMP folder,        *
+ *  please use reinstall if the intention is to reinstall the COMP    *
+ **********************************************************************

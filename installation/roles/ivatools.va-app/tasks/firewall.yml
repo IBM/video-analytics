@@ -1,0 +1,42 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for installing IBM Video Analytics
+#
+#   Opens a list of firewall ports
+#   fw_protocol= udp or tcp
+#   ports= [ { 'port': 9999, 'protocol': udp or tcp }, { 'port': 8888, 'protocol': udp or tcp ]
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[firewall.yml] Enabling set of ports on firewall"
+  set_fact: pf1="[firewall.yml] "
+
+- debug:
+    msg: "Opening firewall for port: {{ item }}"
+    verbosity: 2
+  loop: "{{ ports }}"
+  run_once: true
+  delegate_to: localhost
+- name: "{{ pf1 }}Open ports with firewalld"
+  firewalld:
+     port: "{{ item.port }}/{{ item.protocol }}"
+     permanent: yes
+     immediate: yes
+     offline: yes
+     state: enabled
+  when: ansible_os_family == 'RedHat'
+  loop: "{{ ports }}"
+  become: yes
+
+- name: "{{ pf1 }}Open ports with ufw"
+  ufw:
+     rule: allow
+     port: '{{ item.port|replace("-",":") }}'
+     proto: '{{ item.protocol }}'
+  when: ansible_os_family == 'Debian'
+  loop: "{{ ports }}"
+  become: yes

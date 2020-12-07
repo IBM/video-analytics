@@ -1,0 +1,66 @@
+---
+############################################################################
+#
+#   Ansible Playbook to stop the IVA application
+#
+#   Tested on 04 Dec 2020
+#
+############################################################################
+- name: IBM Video Analytics system Stop
+  hosts: all
+  gather_facts: no
+  tasks:
+  - name: "Setting ansible_become_password = ansible_password by default"
+    set_fact:
+      ansible_become_password: "{{ ansible_password }}"
+    when: ansible_become_password is not defined
+    tags: always
+
+- name: IBM Video Analytics SSE Stop
+  hosts:
+  - sse
+  - allinone
+  gather_facts: no
+  vars:
+    target_dir: "{{ watvid_dir }}/watvid/sse"
+  tasks:
+  - block:
+    - name: "Stop the SSE"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: ./stop.sh
+    tags: sse
+    become: yes
+
+- name: IBM Video Analytics DLE Stop
+  hosts:
+  - dle
+  - allinone
+  gather_facts: no
+  vars:
+    target_dir: "{{ watvid_dir }}/watvid/dle"
+  tasks:
+  - block:
+    - name: "Stop the DLE"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: ./stop.sh
+    tags: dle
+    become: yes
+
+- name: IBM Video Analytics MILS Stop
+  hosts:
+  - mils
+  - allinone
+  gather_facts: no
+  vars:
+    target_dir: "{{ watvid_dir }}/watvid/mils/scripts"
+  tasks:
+  - block:
+    - name: "Stop the MILS"
+      command:
+        chdir: "{{ target_dir }}"  
+        cmd: ./stop.sh
+    tags: mils
+    become: yes
+   

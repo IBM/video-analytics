@@ -1,0 +1,11 @@
+---
+############################################################################
+#
+#   Ansible default values for ivatools.dle role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+temp_dir: '/var/tmp/ivatools'

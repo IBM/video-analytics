@@ -1,0 +1,91 @@
+---
+############################################################################
+#
+#   Ansible tasks for va-ansible project
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[ivatools.system/tasks/parsetags.yml] starting"
+  set_fact: pf="[parsetags.yml] "
+  tags: always
+
+############################################################################
+#   Checking components Compatibility
+#    - We check that only one of these actions is enabled.
+#    - Default components are: mils, sse, dle
+#    Tags: start,dle is tranformed into a component dict:
+#        "component": {
+#           "dle": true,
+#           "mils": false,
+#           "sse": false,
+#           "tools": false,
+#           "nvidiadriver": false,
+#           "nvidiaruntime": false,
+#           "docker": false,
+#           "sys": false
+#   }
+############################################################################
+- name: "{{ pf }}Set default components: mils, sse, dle, tools,nvidiadriver,nvidiaruntime,docker,sys"
+  set_fact:
+    component: {'mils': true, 'sse': true, 'dle': true, 'tools': true, 'nvidiadriver': true, 'nvidiaruntime': true, 'docker': true, 'sys': true}
+  when: component is not defined
+  tags: always
+  run_once: true
+  delegate_to: localhost
+- block:
+  - name: "{{ pf }}Clean-up components before applying component tags ( --tags {{ component.keys()|list|flatten }} )"
+    set_fact:
+      component: "{{ component|combine({'dle': false, 'sse': false, 'mils': false, 'tools': false, 'nvidiadriver': false, 'nvidiaruntime': false, 'docker': false, 'sys': false})}}"
+    tags: always
+  - name: "{{ pf }}Enable MILS tag"
+    set_fact:
+      component: "{{ component|combine({'mils': true}) }}"
+    tags: mils
+  - name: "{{ pf }}Enable SSE tag"
+    set_fact:
+      component: "{{ component|combine({'sse': true}) }}"
+    tags: sse
+  - name: "{{ pf }}Enable DLE tag"
+    set_fact:
+      component: "{{ component|combine({'dle': true}) }}"
+    tags: dle
+  - name: "{{ pf }}Enable TOOLS tag"
+    set_fact:
+      component: "{{ component|combine({'tools': true}) }}"
+    tags: tools
+  - name: "{{ pf }}Enable NVIDIADRIVER tag"
+    set_fact:
+      component: "{{ component|combine({'nvidiadriver': true}) }}"
+    tags: 
+     - nvidiadriver
+     - nvidia-driver
+     - nvidia
+  - name: "{{ pf }}Enable NVIDIARUNTIME tag"
+    set_fact:
+      component: "{{ component|combine({'nvidiaruntime': true}) }}"
+    tags:
+     - nvidiaruntime
+     - nvidia-runtime
+     - nvidia-docker
+     - nvidia-container
+     - nvidia-container-toolkit
+     - nvidia-container-runtime
+     - nvidia
+  - name: "{{ pf }}Enable DOCKER tag"
+    set_fact:
+      component: "{{ component|combine({'docker': true}) }}"
+    tags: docker
+  - name: "{{ pf }}Enable SYS tag"
+    set_fact:
+      component: "{{ component|combine({'sys': true}) }}"
+    tags: sys
+  - debug:
+      var: component
+      verbosity: 1
+    tags: always
+  when: component.keys()|intersect(ansible_run_tags)|length >0 or component.keys()|intersect(ansible_skip_tags)|length >0
+  run_once: true
+  delegate_to: localhost

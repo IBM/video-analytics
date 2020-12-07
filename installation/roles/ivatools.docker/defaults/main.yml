@@ -1,0 +1,12 @@
+---
+############################################################################
+#
+#   Ansible default values for ivatools.docker role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+min_docker_version: '18.09'
+# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html

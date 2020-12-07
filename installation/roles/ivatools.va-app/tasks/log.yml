@@ -1,0 +1,26 @@
+---
+############################################################################
+#
+#   Ansible tasks for va-ansible project
+#       used for installing IBM Video Analytics
+#
+#   Tested on 07 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+# Check software version and set version specific parameters
+- name: "[log.yml] Reporting nodes configuration"
+  set_fact: pf="[log.yml] "
+- debug:
+    msg: "{{ lookup('template', 'reportVariables.template').split('\n') }}"
+- set_fact:
+    logfilename: "{{ (ansible_date_time.iso8601_basic_short).replace('T','-')}}-{{ (inventory_file|basename).replace ('.ini','')}}-install.log"
+- name: "{{ pf }}Logging configuration in {{ logfilename }}"
+  blockinfile:
+    path: "./{{ logfilename }}"
+    create: yes
+    marker: "# {mark} {{ inventory_hostname }} Configuration"
+    block: "{{ lookup('template', 'reportVariables.template') }}"
+  delegate_to: localhost
+  throttle: 1
+  

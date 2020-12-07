@@ -1,0 +1,64 @@
+---
+############################################################################
+#
+#   Ansible tasks for va-ansible project
+#       used for installing IBM Video Analytics
+#
+#   Tested on 07 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+# Check software version and set version specific parameters
+- block:
+  - name: "Discovering DLE software package in folder {{ software_dir }}"
+    shell: >
+      find {{ software_dir }} -iname "*DLE*{{ ansible_architecture }}.tgz"|grep  -v "FR"|grep -v "DEMOGRAPHICS"|grep -v "TRIAL"|sort -r
+    register: archive_reg
+  - set_fact:
+      va_software: "{{ va_software|default({})|combine({ 'dle': archive_reg.stdout }) }}"
+    when: archive_reg.stdout|default("") != ""
+  - set_fact:
+      va_software: "{{ va_software|default({})|combine({ 'version': (archive_reg.stdout|basename).split('-')|first }) }}"
+    when: va_software.version|default("") == "" and archive_reg.stdout|default("") != ""
+#  - debug:
+#      msg: "{{ archive_reg.stdout|basename }} >= {{ item.key }}: {{ item.key is version ( archive_reg.stdout|basename, '<') }} "
+#    loop: "{{ version_specific|dict2items }}"
+#    when: "archive_reg.stdout|default('') != '' and item.value.cuda_runtime is defined"
+  - name: "Gathering cuda_runtime version"
+    set_fact:
+      va_software: "{{ va_software|default({})|combine({ 'cuda_runtime': item.value.cuda_runtime }) }}"      
+    loop: "{{ version_specific|dict2items }}"
+    when: "archive_reg.stdout|default('') != '' and archive_reg.stdout|basename is version ( item.key, '>=') and item.value.cuda_runtime is defined"
+
+  - name: "Discovering MILS software package in folder {{ software_dir }}"
+    shell: >
+      find {{ software_dir }} -iname "*MILS*{{ ansible_architecture }}.tgz"|grep  -v "FR"|grep -v "DEMOGRAPHICS"|grep -v "TRIAL"|sort -r
+    register: archive_reg
+  - set_fact:
+      va_software: "{{ va_software|default({})|combine({ 'mils': archive_reg.stdout }) }}"
+    when: archive_reg.stdout|default("") != ""
+  - set_fact:
+      va_software: "{{ va_software|default({})|combine({ 'version': (archive_reg.stdout|basename).split('-')|first }) }}"
+    when: va_software.version|default("") == "" and archive_reg.stdout|default("") != ""
+
+  - name: "Discovering SSE software package in folder {{ software_dir }}"
+    shell: >
+      find {{ software_dir }} -iname "*SSE*{{ ansible_architecture }}.tgz"|grep  -v "FR"|grep -v "DEMOGRAPHICS"|grep -v "TRIAL"|sort -r
+    register: archive_reg
+  - set_fact:
+      va_software: "{{ va_software|default({})|combine({ 'sse': archive_reg.stdout }) }}"
+    when: archive_reg.stdout|default("") != ""
+  - set_fact:
+      va_software: "{{ va_software|default({})|combine({ 'version': (archive_reg.stdout|basename).split('-')|first }) }}"
+    when: va_software.version|default("") == "" and archive_reg.stdout|default("") != ""
+  run_once: true
+  delegate_to: localhost
+
+- name: "Gathering liveproxy version"
+  set_fact:
+    va_software: "{{ va_software|default({})|combine({ 'liveproxy': item.value.liveproxy[ansible_architecture] }) }}"      
+  loop: "{{ version_specific|dict2items }}"
+  when: "archive_reg.stdout|default('') != '' and archive_reg.stdout|basename is version ( item.key, '>=') and item.value.liveproxy is defined"
+- debug:
+    var: va_software  
+    verbosity: 1  

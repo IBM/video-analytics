@@ -1,0 +1,24 @@
+Distribution: {{ ansible_distribution }} v {{ ansible_distribution_version }} ({{ ansible_distribution_release }}), {{ ansible_os_family }} family, Architecture: {{ ansible_architecture }}
+IVA Software v{{ va_software.version|default('??') }} on the control node in {{ software_dir }}
+  - mils: {{ va_software.mils|default('???') }}
+  - sse : {{ va_software.sse|default('???') }}
+  - dle : {{ va_software.dle|default('???') }}
+IVA Software on the managed nodes will be copied in {{ temp_dir }}
+
+Target installation folder on managed nodes: {{ watvid_dir }}
+User: {{ ansible_user }}, Become/sudo password is {{ (ansible_password != ansible_become_password)| ternary('not ','') }}the same as the {{ ansible_user }} password
+
+{% if topology.dle %}
+DLE config:
+  - CUDA Runtime Version: {{ va_software.cuda_runtime|default('???') }}
+  - DLE service: {{ dle_service|default('default') }}
+
+{% endif %}
+{% if topology.sse %}
+SSE config:
+  - liveproxy: {{ va_software.liveproxy|default('???') }}
+  - VFI: {{ vfi|default('no') }}
+
+{% endif %}
+Topology:
+{{ topology|default({})|to_nice_json(indent=4) }}

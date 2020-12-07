@@ -1,0 +1,44 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.docker role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml] starting"
+  set_fact: pf="[{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml] "
+
+- block:
+  - name: "{{ pf }}Ensure dependencies are installed"
+    apt:
+      name:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+      state: present
+
+  - name: "{{ pf }}Add Docker apt key"
+    apt_key:
+      url: "{{ docker_apt_gpg_key }}"
+      id: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+      state: present
+    register: add_repository_key
+    ignore_errors: yes
+
+  - name: "{{ pf }}Add Docker apt key"
+    shell: >
+      curl -sSL {{ docker_apt_gpg_key }} | sudo apt-key add -
+    args:
+      warn: false
+    when: add_repository_key is failed
+
+  - name: "{{ pf }}Add Docker repository"
+    apt_repository:
+      repo: "{{ docker_apt_repository }}"
+      state: present
+      update_cache: true
+  become: yes

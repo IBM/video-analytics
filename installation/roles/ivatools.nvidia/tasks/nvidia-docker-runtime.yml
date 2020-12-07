@@ -1,0 +1,147 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.nvidia role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[nvidia-docker-runtime.yml] starting"
+  set_fact: pf="[nvidia-docker-runtime.yml] "
+
+- name: "{{ pf }}Checking if cuda_runtime is defined in va_software"
+  block:
+  - debug:
+      msg: "{{ lookup('template', 'missingCudaRuntime.txt').split('\n') }}"
+    failed_when: true
+  - fail:
+      msg: aborting...
+  when: "cuda_runtime_version|default('') == ''"
+  delegate_to: localhost
+    
+#  shell: docker images | grep "nvidia/cuda" | grep "{{ cuda_runtime_version }}"
+- name: "{{ pf }}checking presence of nvidia/cuda docker image"
+  shell: >
+     docker images | grep "nvidia/cuda" | grep "{{ cuda_runtime_version }}" 
+  register: docker_runtime_image
+  changed_when: false
+  become: yes
+  ignore_errors: yes
+
+- name: "{{ pf }} NVIDIA docker {{ nvidia_cuda_runtime[ ansible_architecture ].docker_image }}"
+  command: >
+        docker run --rm {{ nvidia_cuda_runtime[ ansible_architecture ].docker_image }} nvidia-smi
+  changed_when: false
+  become: yes
+  register: docker_nvidia_smi
+  ignore_errors: yes
+- debug:
+    var: docker_runtime_image.stdout_lines
+- debug:
+    var: docker_nvidia_smi.stdout_lines
+    verbosity: 2
+
+#
+# Installation
+#
+- block:
+  - name: "{{ pf }}Add NVIDIA repo key on Debian"
+    apt_key:
+      url: https://nvidia.github.io/nvidia-docker/gpgkey
+      state: present
+    when: ansible_os_family == "Debian"
+  - debug:
+      var: nvidia_repos[ ansible_distribution ]
+      verbosity: 2
+#  - debug:
+#      var: lookup('url',nvidia_repos[ ansible_distribution ].nvidia_docker_repo_url, split_lines=true).split(',')| select('match', '^[^#]')|list
+#    register: sources_list
+  - name: "{{ pf }}Add nvidia-docker repository"
+    get_url:
+      url: "{{ nvidia_repos[ ansible_distribution ].nvidia_docker_repo_url }}"
+      dest: "{{ nvidia_repos[ ansible_distribution ].nvidia_docker_repo_file }}"
+      owner: root
+      group: root
+      mode: 0644
+  - name: "{{ pf }}Install nvidia-docker packages (Debian)"
+    apt:
+      name: "{{ nvidia_repos[ ansible_distribution ].nvidia_docker_packages }}"
+      state: present
+      update_cache: yes
+    when: ansible_os_family == "Debian"
+  - name: "{{ pf }}Install nvidia-docker packages (non-Debian)"
+    package:
+      name: "{{ nvidia_repos[ ansible_distribution ].nvidia_docker_packages }}"
+      state: present
+    when: ansible_os_family != "Debian"
+
+  - name: "{{ pf }}Check docker daemon"
+    slurp:
+      src: "{{ docker_daemon_json }}"
+    register: docker_daemon
+    ignore_errors: yes
+  - name: "{{ pf }}Existing /etc/docker/daemon.json"
+    debug:
+      msg: "{{ docker_daemon['content'] | b64decode | from_json }}"
+    ignore_errors: yes
+    when: not docker_daemon.failed
+  - name:
+    set_fact:
+      nvidia_runtime_exists: ( docker_daemon['content'] | b64decode | from_json )['runtimes']['nvidia']
+    ignore_errors: yes
+    when: not docker_daemon.failed
+#
+# docker/daemon.json is not present or has no nvidia runtime
+#
+  - name: "{{ pf }}Update {{ docker_daemon_json }}"
+    copy:
+      src: "templates/daemon.json"
+      dest: "{{ docker_daemon_json }}"
+      owner: root
+      group: root
+      mode: '0644'
+      backup: yes
+#    notify: restart docker
+    when: docker_daemon.failed or nvidia_runtime is not defined
+#
+# docker/daemon.json is present but has no nvidia runtime
+#
+  - name: "{{ pf }}Update {{ docker_daemon_json }}"
+    copy:
+      content: "{{ docker_daemon['content'] | b64decode | from_json |combine({'default-runtime': 'nvidia'})| to_nice_json }}"
+      dest: "{{ docker_daemon_json }}"
+      owner: root
+      group: root
+      mode: '0644'
+      backup: yes
+#    notify: restart docker
+    when: not docker_daemon.failed and nvidia_runtime_exists is defined
+  - name: "{{ pf }}Starting and enabling the service"
+    service:
+      state: restarted
+      name: docker
+      enabled: yes
+  when: (docker_runtime_image.stdout == "" or docker_nvidia_smi.stdout == "")
+  become: yes
+- name: "{{ pf }}Ensure handlers are notified now"
+  meta: flush_handlers
+
+- name: "{{ pf }}Re-starting service"
+  service:
+    state: restarted
+    name: docker
+    enabled: yes
+  become: yes
+
+- name: "{{ pf }} NVIDIA docker {{ nvidia_cuda_runtime[ ansible_architecture ].docker_image }}"
+  command: >
+      docker run --rm {{ nvidia_cuda_runtime[ ansible_architecture ].docker_image }} nvidia-smi
+  changed_when: false
+  register: docker_nvidia_smi_test
+  ignore_errors: yes
+- name: "{{ pf }}Exit if nvidia-docker runtime is not working"
+  fail:
+    msg: "FATAL ERROR: nvidia-docker runtime test FAILED {{ docker_nvidia_smi_test }}, aborting"
+  when: docker_nvidia_smi_test.rc != 0

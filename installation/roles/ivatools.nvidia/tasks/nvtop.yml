@@ -1,0 +1,152 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.nvidia role 
+#       used for installing IBM Video Analytics
+#
+#   Tested on 26 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[nvtop.yml] starting"
+  set_fact: pf="[nvtop.yml] "
+
+- name: "{{ pf }}nvtop check"
+  command: nvtop -v
+  changed_when: false
+  failed_when: false
+  register: nvtop
+  ignore_errors: yes
+- debug:
+    msg: "{{ nvtop.stdout }}"
+  when: not nvtop.failed and nvtop.rc == 0
+- name: "{{ pf }}Installing nvtop from repositories"
+  package:
+    name: "nvtop"
+    state: present
+  register: nvtop_in_repo
+  when: nvtop.rc != 0
+  ignore_errors: yes
+
+- block:
+  - debug:
+      msg: "{{ pf }}Compiling nvtop for {{ ansible_distribution }} {{ ansible_distribution_version }}/{{ ansible_architecture }}"
+
+  - name: "{{ pf }}Install nvtop pre-reqs packages (Debian)"
+    apt:
+      name: cmake,build-essential,libncurses5-dev,libncursesw5-dev,git,cuda-nvml-dev-11-1
+      state: present
+      update_cache: yes
+    when: ansible_os_family == "Debian"
+  - block:
+    - name: "{{ pf }}Install nvtop pre-reqs packages (non-Debian)"
+      package:
+        name: "ncurses-devel,git,cuda-nvml-dev-1*"
+        state: present
+    - name: "{{ pf }}Creates tmp directory for compilation"
+      file:
+        path: /var/tmp
+        state: directory
+    - name: "{{ pf }}Download and unarchive cmake"
+      unarchive:
+        src: https://cmake.org/files/v3.6/cmake-3.6.2.tar.gz
+        dest: /var/tmp
+        remote_src: yes
+    - name: "{{ pf }}Bootstrap cmake"
+      command:
+        chdir: /var/tmp/cmake-3.6.2
+        cmd: >
+          ./bootstrap --prefix=/usr/local
+    - name: "{{ pf }}Compile cmake"
+      command:
+        chdir: /var/tmp/cmake-3.6.2
+        cmd: >
+          make
+    - name: "{{ pf }}Install cmake"
+      command:
+        chdir: /var/tmp/cmake-3.6.2
+        cmd: >
+          make install
+    - name: "{{ pf }}Check cmake in /usr/bin"
+      stat:
+        path: /usr/bin/cmake
+      register: cmake_bin
+
+    - name: "{{ pf }}Linking cmake in /usr/bin"
+      file:
+        src: '/usr/local/bin/cmake'
+        dest: '/usr/bin/cmake'
+        state: link
+        force: no
+        mode: '0755'
+      when: not cmake_bin.stat.exists
+    - name: "{{ pf }}Removes cmake compilation folder"
+      file:
+        path: /var/tmp/cmake-3.6.2
+        state: absent
+    when: ansible_os_family != "Debian"
+  - name: "{{ pf }}Clone a repo with separate git directory"
+    git:
+      repo: https://github.com/Syllo/nvtop.git
+      dest: /var/tmp/nvtop
+  - name: "{{ pf }}Creates nvtop compilation folder"
+    file:
+      path: /var/tmp/nvtop/build
+      state: directory
+      mode: '0777'
+  - name: "{{ pf }}Compile nvtop"
+    command:
+      chdir: /var/tmp/nvtop/build
+      cmd: >
+        cmake .. -DNVML_RETRIEVE_HEADER_ONLINE=True
+  - name: "{{ pf }}Get nvml.h"
+    command:
+      chdir: /var/tmp/nvtop/build
+      cmd: >
+        find /usr -name "nvml.h" -exec cp '{}' include/ ';'
+  - name: "{{ pf }}Make Install"
+    command:
+      chdir: /var/tmp/nvtop/build
+      cmd: >
+        make install
+  - name: "{{ pf }}Removes compilation folder"
+    file:
+      path: /var/tmp/nvtop
+      state: absent
+    failed_when: false
+
+  when: nvtop.rc != 0 and nvtop_in_repo.failed
+  become: yes
+
+
+#- name: "{{ pf.msg }}Installing NVIDIA driver for {{ ansible_distribution }} {{ ansible_distribution_version }}/{{ ansible_architecture }}"
+
+- include_tasks: "nvidia-driver-{{ ansible_os_family }}.yml"
+  when: nvidia_smi.rc != 0
+
+#echo "-- Downloading and installing nvtop on $(date)"
+#sudo mkdir -p "$WATVID_TEMP_DIR/nvtopbuild"
+#sudo chmod 777 "$WATVID_TEMP_DIR/nvtopbuild"
+#cd "$WATVID_TEMP_DIR/nvtopbuild"
+#
+#if [ "ubuntu" = "$WATVID_LINUX_DISTRO" ]; then
+#	sudo apt install -y cmake build-essential libncurses5-dev libncursesw5-dev git
+#	if [ $? != 0 ] ; then
+#    	    echo "Failed to install nvtop pre-reqs"
+#    	    exit 1
+#        fi
+#fi
+#if [ "rhel" = "$WATVID_LINUX_DISTRO" ]; then
+#	sudo yum install -y ncurses-devel git
+#	if [ $? != 0 ] ; then
+#    	    echo "Failed to install nvtop pre-reqs"
+#    	    exit 1
+#        fi
+#	wget https://cmake.org/files/v3.6/cmake-3.6.2.tar.gz
+#	tar -zxvf cmake-3.6.2.tar.gz
+#	cd cmake-3.6.2
+#	sudo ./bootstrap --prefix=/usr/local
+#	sudo make
+#	sudo make install
+#	cd ..
+#fi
