@@ -66,7 +66,33 @@
       chdir: "{{ cmd_dir }}"  
       cmd: ./start.sh --load
       stdin: "                                                  YES"
+    ignore_errors: yes
     register: start_output
+  - block:
+    - name: "{{ pf }}Read SSE docker-compose file"
+      slurp:
+        src: "{{ cmd_dir }}/sse-docker-compose.yml"
+      register: slurped_sse_compose
+    - set_fact:   
+        sse_compose: "{{ slurped_sse_compose['content'] | b64decode | from_yaml }}"
+    - debug:   
+        var: sse_compose
+        verbosity: 2
+    - name: "{{ pf }}Update network_mode in {{ cmd_dir }}/sse-docker-compose.yml"
+      template:
+        src: "templates/sse-docker-compose.yml"
+        dest: "{{ cmd_dir }}/sse-docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0644'
+        backup: yes
+    - name: "{{ pf }}Load the SSE (with Bridge network_mode)"
+      command:
+        chdir: "{{ cmd_dir }}"  
+        cmd: ./start.sh --load
+        stdin: "                                                  YES"
+      register: start_output
+    when: "start_output.failed and start_output.stderr is search('network_mode is incompatible with port_bindings')"
   - name: "{{ pf }}Set mils-ip"
     set_fact:
       mils_ip: "{{ topology.mils_node.pingOk|default(topology.mils_node.ipv4)|default(topology.mils_node.hostname) }}"

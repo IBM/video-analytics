@@ -1,0 +1,3 @@
+ #### Updated by ivatools installer
+ # network_mode was updated from "host" to "bridge"
+{{ sse_compose|combine({ 'services': sse_compose.services|combine({ 'sse': sse_compose.services.sse|combine({ 'network_mode': 'bridge'}) })  })|to_nice_yaml }}

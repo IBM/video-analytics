@@ -60,7 +60,7 @@
     set_fact:
       mils_nodes: >
         {{ mils_nodes| default({}) |combine({ item: {
-              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address'],
+              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address']|default(omit),
               'ipv6': (hostvars[item].ansible_facts.ipv6|default(hostvars[item].ansible_facts.default_ipv6)|default(omit))['address']|default(omit),
               'hostname': hostvars[item].ansible_facts.fqdn|default(hostvars[item].ansible_facts.hostname),
               'inventory_hostname': item,
@@ -80,7 +80,7 @@
     set_fact:
       sse_nodes: >
         {{ sse_nodes| default({}) |combine({ item: {
-              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address'],
+              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address']|default(omit),
               'ipv6': (hostvars[item].ansible_facts.ipv6|default(hostvars[item].ansible_facts.default_ipv6))['address']|default(omit),
               'hostname': hostvars[item].ansible_facts.fqdn|default(hostvars[item].ansible_facts.hostname),
               'inventory_ipaddr': item|ipaddr|ternary(item|ipaddr,omit,omit),
@@ -101,7 +101,7 @@
     set_fact:
       dle_nodes: >
         {{ dle_nodes| default({}) |combine({ item: {
-              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address'],
+              'ipv4': (hostvars[item].ansible_facts.ipv4|default(hostvars[item].ansible_facts.default_ipv4))['address']|default(omit),
               'ipv6': (hostvars[item].ansible_facts.ipv6|default(hostvars[item].ansible_facts.default_ipv6))['address']|default(omit),
               'inventory_ipaddr': item|ipaddr|ternary(item|ipaddr,omit,omit),
               'hostname': hostvars[item].ansible_facts.fqdn|default(hostvars[item].ansible_facts.hostname)
@@ -124,7 +124,7 @@
     set_fact:
       topology: >
          {{ topology|default({})|combine({ 
-            'ipv4': (ansible_facts.ipv4|default(ansible_facts.default_ipv4))['address'], 
+            'ipv4': (ansible_facts.ipv4|default(ansible_facts.default_ipv4))['address']|default(omit), 
             'ipv6': (ansible_facts.ipv6|default(ansible_facts.default_ipv6))['address']|default(omit), 
             'hostname': ansible_facts.fqdn|default(ansible_facts.hostname),
             'inventory_ipaddr': inventory_hostname|ipaddr|ternary(inventory_hostname|ipaddr,omit,omit),

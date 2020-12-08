@@ -50,12 +50,14 @@ This section contains the managed nodes where the mils component is installed.
 [sse]
 -----
 This section contains the managed nodes where the sse component is installed.
+Supported parameters:
+* **vfi**  yes/no, by default: no
 
 [dle]
 -----
 This section contains the managed nodes where the dle component is installed
-Supported parameter:
-* **dle_node**  to select a specific service file (low-memory, objects-only, people-only)
+Supported parameters:
+* **dle_service**  to select a specific service file (low-memory, objects-only, people-only)
 
 
 Command Line Options
@@ -64,6 +66,7 @@ There are "installation" playbooks to deploy an environment:
 * ansible-playbook -i <inventory file> va-install.yml
 * ansible-playbook -i <inventory file> va-reinstall.yml
 * ansible-playbook -i <inventory file> va-remove.yml
+
 and "management" playbooks to manage a deployed environment:
 * ansible-playbook -i <inventory file> va-stop.yml
 * ansible-playbook -i <inventory file> va-start.yml
@@ -77,21 +80,21 @@ ansible-playbook -i <inventory file> va-restart.yml **--skip-tags** "mils"
 Installation playbooks have additional tags for installing/reinstalling specific packages or services.
   * tools (nvtop,arp-scan,...)
   * nvidiadriver (nvidia-driver)
-  * nvidiaruntime (nvidia container-runtime)
+  * nvidiaruntime (nvidia container runtime)
   * docker (docker service)
   * sys (system packages and repositories like epel, python3,..)
 
 **Supported tags/playbook matrix**
 Playbook/Tag | sys | docker | nvidiadriver | nvidiaruntime | mils | sse | dle | tools
 ---------------- | --- | ------ | ------------ | ------------- | ---- | --- | --- | -----
-va-install | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes
-va-reinstall | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes
-va-remove | No | No | No | No | Yes | No | No | No
-va-start | - | Yes | - | use docker | Yes | No | Yes | -
-va-restart | - | Yes | - | use docker | Yes | No | Yes | -
-va-stop | - | Yes | - | use docker | Yes | No | Yes | -
+va-install | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes
+va-reinstall | No | No | No | No | Yes | Yes | Yes | No
+va-remove | No | No | No | No | Yes | Yes | Yes | No
+va-start | - | Yes | - | - | Yes | Yes | Yes | -
+va-restart | - | Yes | - | - | Yes | Yes | Yes | -
+va-stop | - | Yes | - | - | Yes | Yes | Yes | -
  
 Examples:
  * **ansible-playbook -i <inventory file> va-install.yml** will install all IVA components
  * **ansible-playbook -i <inventory file> va-restart.yml --tags "mils,sse"** will restart mils and sse components
- * **ansible-playbook -i <inventory file> va-reinstall.yml --tags "nvidia-driver"** will re-install the nvidia-driver on DLE nodes
+ * **ansible-playbook -i <inventory file> va-reinstall.yml --tags "dle"** will re-install the dle component on DLE nodes

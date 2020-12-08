@@ -20,30 +20,29 @@
 - block:
   - name: "{{ pf1 }}Add external SSE hostname mappings in start.sh"
     lineinfile:
-      path: "{{ mils_dir }}/scripts/start.sh"
+      path: "{{ watvid_dir }}/watvid/mils/scripts/start.sh"
       insertafter: '^(\s+)--add-host \$hostname:\$ipaddr'
       firstmatch: yes
-      line: ' --add-host {{ item.hostname }}:{{ item.pingOK }} \'
-#      state: "{{ action.remove|ternary('absent','present','present') }}"
+      line: ' --add-host {{ item.hostname }}:{{ item.pingOK|default(item.ipv4)|default(item.inventory_ipaddr) }} \'
       state: present
     loop: "{{ topology.mils_ext_clients|default([])|list }}"
     ignore_errors: yes
   - name: "{{ pf1 }}Add external SSE hostname mappings in runMILS.sh"
     lineinfile:
-      path: "{{ mils_dir }}/scripts/runMILS.sh"
+      path: "{{ watvid_dir }}/watvid/mils/scripts/runMILS.sh"
       insertafter: '^(\s+)--add-host \$hostname:\$ipaddr'
       firstmatch: yes
-      line: ' --add-host {{ item.hostname }}:{{ item.pingOK }} \'
+      line: ' --add-host {{ item.hostname }}:{{ item.pingOK|default(item.ipv4)|default(item.inventory_ipaddr) }} \'
       state: present
     loop: "{{ topology.mils_ext_clients|default([])|list }}"
     failed_when: false
   - name: "{{ pf1 }}Add external SSE hostname mappings in reinitMILS.sh"
     lineinfile:
-      path: "{{ mils_dir }}/scripts/reinitMILS.sh"
+      path: "{{ watvid_dir }}/watvid/mils/scripts/reinitMILS.sh"
       insertafter: '^(\s+)--add-host \$hostname:\$ipaddr'
       firstmatch: yes
       state: present
-      line: ' --add-host {{ item.hostname }}:{{ item.pingOK }} \'
+      line: ' --add-host {{ item.hostname }}:{{ item.pingOK|default(item.ipv4)|default(item.inventory_ipaddr) }} \'
     loop: "{{ topology.mils_ext_clients|default([])|list }}"
     failed_when: false
   when: "topology.mils_ext_clients|length > 0"
