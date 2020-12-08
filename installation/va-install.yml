@@ -1,13 +1,12 @@
 ---
 ############################################################################
 #
-#   Install IVA on a single machine using ansible playbook
+#   IVA Installation playbook
 #
-#   Tested on 04 Dec 2020
-#   Author: Robin Mulkers
+#   Tested on 08 Dec 2020
 #
 ############################################################################
-- name: system-check
+- name: IVA System Preparation
   hosts: all
   gather_facts: yes
   vars:

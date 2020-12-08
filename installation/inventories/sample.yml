@@ -1,0 +1,56 @@
+##############################################################################################################
+#
+#       Ansible inventory yml file
+#
+#  See: https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html
+#
+# ansible_connection could be 'local' (if the installation is local to the machine where ansible is running)
+# or 'ssh' if the installation is on a remote machine
+#
+# passwords could be passed as parameters to the ansible command instead of being configured in clear here
+# $ ansible-playbook -i myinventory.ini ansible/va-playbook.yml --user myuser --ask-pass mypassword
+#
+# Ansible has also a vault system to encrypt passwords: https://docs.ansible.com/ansible/latest/user_guide/vault.html#id1
+#
+# user could be root or another user. If the user is not root, then the 'ansible_become_password' parameter is mandatory
+# but the ansible project here is using the 'ansible_password' by default for 'ansible_become_password'.
+#
+#   Tested on 03 Nov 2020
+#   Author: Robin Mulkers
+#
+##############################################################################################################
+all:
+  vars:
+# Folder on the control node where the IVA software archives are located
+    software_dir: "~/Downloads/va106"
+# IVA Watvid folder location on the managed nodes
+    watvid_dir: "/opt/ibm/va106"
+    temp_dir:  "/tmp/va106"
+    
+  children:  
+    allinone:
+      hosts:
+    mils:
+      hosts:
+        '192.168.2.187':
+          ansible_connection: ssh
+          ansible_user: pvadmin
+          ansible_password: passw0rd
+    sse:
+      hosts:
+        '192.168.2.121':
+          ansible_connection: ssh
+          ansible_user: pvadmin
+          ansible_password: passw0rd
+        '192.168.2.122':
+          ansible_connection: ssh
+          ansible_user: pvadmin
+          ansible_password: passw0rd
+    dle:
+      hosts:
+        '192.168.2.216':
+          ansible_connection: ssh
+          ansible_user: pvadmin
+          ansible_password: passw0rd
+          ansible_python_interpreter: /usr/bin/python3
+          dle_service: "objects-only"

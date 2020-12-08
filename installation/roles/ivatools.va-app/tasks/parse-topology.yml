@@ -203,12 +203,17 @@
 #         {{ topology|combine ({ 'mils_ext_clients': topology.mils_ext_clients|default({})|combine({ item.value.hostname: item.value}) }) }}
     when: 'topology.mils and mils_clients is defined and item.key in mils_clients and item.key != inventory_hostname'
     loop: "{{ sse_nodes| default({}) | dict2items }}"
+  - name: "{{ pf }}Set default MILS node on SSE nodes"
+    set_fact:
+      topology: >
+         {{ topology|combine ({ 'mils_node': { 'inventory_ipaddr': mils_node|ipaddr|ternary(mils_node|ipaddr,omit,omit) } }) }}
+    when: 'topology.sse and mils_node is defined'
   - name: "{{ pf }}Set mils_node in SSE topology"
     set_fact:
       topology: >
          {{ topology|combine ({ 'mils_node': item.value }) }}
     when: 'topology.sse and mils_node|trim == item.key'
-    loop: "{{ mils_nodes|dict2items }}"
+    loop: "{{ mils_nodes|default({})|dict2items }}"
   delegate_to: localhost
   tags: always
 #
@@ -255,13 +260,18 @@
   tags: always
 
 - debug:
-    msg: "Default DLE is {{ dles|default('not defined') }}"
+    msg: "Default DLE is {{ dles|default('no DLE defined') }}"
   tags: always
 #
 # Default DLE, there must be one and only one
 #
 - block:
-  - name: "{{ pf }}Set default DLE service on SSE nodes"
+  - name: "{{ pf }}Set default DLE node on SSE nodes"
+    set_fact:
+      topology: >
+         {{ topology|combine ({ 'dle_node': { 'inventory_ipaddr': dle_node|ipaddr|ternary(dle_node|ipaddr,omit,omit) } }) }}
+    when: 'topology.sse and dle_node is defined'
+  - name: "{{ pf }}Set DLE service on SSE nodes"
     set_fact:
       topology: >
          {{ topology|combine ({ 'dle_node': item.value }) }}

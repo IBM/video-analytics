@@ -1,0 +1,183 @@
+---
+############################################################################
+#
+#   Check Python 2/3 and configure pvadmin user on managed nodes
+#
+#   Tested on 27 Oct 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- hosts: all
+  gather_facts: false
+  vars:
+    ansible_become_password: "{{ ansible_password }}"
+    discovery: {}
+    output_tc: []
+  tasks:
+  - name: "Setting ansible_become_password = ansible_password by default"
+    set_fact:
+      ansible_become_password: "{{ ansible_password }}"
+    when: ansible_become_password is not defined
+  - name: "Get Nodes from inventory"
+    set_fact:
+      discovery: >
+        {{ discovery| default({}) |combine({ 'hostid': inventory_hostname, 'components': group_names } ) }}
+    delegate_to: localhost
+  - name: "AllInOne nodes"
+    set_fact:
+      discovery: >
+        {{ discovery| default({}) |combine({ 'components': ['mils', 'sse', 'dle'] } ) }}
+    delegate_to: localhost
+    when: '"allinone" in group_names'
+  - name: Check OS Family (Raw)
+    raw: cat /etc/os-release |grep "^ID="|cut -f2 -d"="|xargs
+    changed_when: false
+    failed_when: false
+    register: linux_distribution_name
+    ignore_errors: true
+#  - debug:
+#      var: linux_distribution_name
+  - name: Check OS Version (Raw)
+    raw: cat /etc/os-release |grep "^VERSION_ID="|cut -f2 -d"="|xargs
+    changed_when: false
+    failed_when: false
+    register: linux_distribution_version
+#  - debug:
+#      var: linux_distribution_version
+  - set_fact:
+      discovery: >
+         {{ discovery|combine({ 'linux': linux_distribution_name.stdout_lines|list|last + ' v' + linux_distribution_version.stdout_lines|list|last } ) }}
+
+  - name: Check for Python3
+    raw: python3 -V
+    changed_when: false
+    failed_when: false
+    register: check_python3
+  - set_fact:
+      discovery: >
+         {{ discovery|combine({ 'python3': check_python3.stdout_lines|list|last } ) }}
+    when: check_python3.rc == 0
+  - debug:
+      msg: "Python3 is installed on {{ linux_distribution_name.stdout_lines|list|last }} v{{ linux_distribution_version.stdout_lines|list|last }}"
+      verbosity: 1
+    when: check_python3.rc == 0
+
+  - name: Check for Python
+    raw: python -V
+    changed_when: false
+    failed_when: false
+    register: check_python2
+  - debug:
+      msg: "Python2 is installed on {{ linux_distribution_name.stdout_lines|list|last }} v{{ linux_distribution_version.stdout_lines|list|last }}"
+      verbosity: 1
+    when: check_python2.rc == 0
+  - set_fact:
+      discovery: >
+         {{ discovery|combine({ 'python2': check_python2.stdout_lines|list|last } ) }}
+    when: check_python2.rc == 0
+
+  - block:
+    - name: Install Python
+      raw: test -e /usr/bin/apt && (apt -y update && apt install -y python-minimal) || (yum -y install python libselinux-python)
+      become: yes
+    - name: Check for Python
+      raw: python -V
+      changed_when: false
+      failed_when: false
+      register: final_check_python2
+    - name: Python final check after installation attempt
+      fail:
+        msg: "Please install manually python3 on {{ inventory_hostname }} {{linux_distribution_name.stdout_lines|list|last }} v{{ linux_distribution_version.stdout_lines|list|last }}"
+      when: check_python2.rc != 0 and check_python3.rc != 0 and final_check_python2.rc !=0
+    - set_fact:
+        discovery: >
+           {{ discovery|combine({ 'python2': final_check_python2.stdout_lines|list|last } ) }}
+      when: final_check_python2.rc == 0
+    when: check_python2.rc != 0 and check_python3.rc != 0
+
+  - name: "Gathering facts on all nodes before defining the topology"
+    gather_facts:
+      parallel: yes
+#  - name: Gather installed packages
+#    package_facts:
+#      manager: auto
+  - name: "Select facts from managed nodes"
+    set_fact:
+      discovery: >
+        {{ discovery| default({}) |combine({ 
+            'architecture': ansible_facts.architecture,
+            'datetime': ansible_facts.date_time.iso8601|default(omit),
+            'timezone': ansible_facts.date_time.tz|default(omit),
+            'ipv4': ansible_facts.ipv4.address|default(ansible_facts.default_ipv4.address)|default(omit),
+            'ipv6': ansible_facts.ipv6.address|default(ansible_facts.default_ipv6.address)|default(omit),
+            'domain': ansible_facts.domain|default(omit),
+            'hostname': ansible_facts.hostname,
+            'fqdn': ansible_facts.fqdn|default('not defined'),
+            'memory': '%d GB free/%d GB'|format(ansible_facts.memfree_mb/1000|int,ansible_facts.memtotal_mb/1000|int),
+            'cpu': '%d cpus with %d cores x%d threads = %d threads'|format(ansible_facts.processor_count|int,ansible_facts.processor_cores|int,ansible_facts.processor_threads_per_core|int,ansible_facts.processor_vcpus|int),
+            'user_id': ansible_facts.user_id
+        }) }}
+  - name: "Select storage from managed nodes"
+    set_fact:
+      discovery: >
+        {{ discovery| combine({ 
+            item.device: '%d GB free/%d GB'|format(item.size_available/1000000000|int,item.size_total/1000000000|int)
+        }) }}
+    when: item.device is not search('loop') and item.device is not search('snap') and item.mount != '/boot' and item.size_total > 5000000000
+    with_items: "{{ ansible_facts.mounts }}"
+#  - name: Create pvadmin user
+#    user:
+#      name: '{{ iva_user }}'
+#      comment: IVA Administrator
+#      system: yes
+#      append: yes
+#    become: yes
+#
+# The SSE configuration requires the MILS hostname during installation.
+#     Aborting if the MILS server is unreachable and we cannot get its hostname/IP
+#     Aborting as well if there are several MILS servers and the SSE doesn't specify which one to use
+#
+  - name: "{{ pf }}Stopping if not all MILS nodes are reachable"
+    fail:
+      msg: Some MILS hosts are unreachable making it impossible to define a consistent topology, please comment out the servers that are not useful, aborting.
+    when: "'ansible_hostname' not in hostvars[item]"
+    tags: always
+    run_once: true
+    delegate_to: localhost
+    with_inventory_hostnames:
+    - mils
+
+  - block:
+    - include_role:
+        name: ivatools.va-app
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: parse-topology
+#
+# Checking connectivity/networking between the different components discovered in the topology
+#
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: check-connectivity
+    - include_role:
+        name: ivatools.va-app
+        tasks_from: log
+
+  - name: "Report nodes configuration"
+    debug:
+      var: topology
+  - name: "Time Synchronization Check"
+    set_fact:
+      output_tc: >
+        {{ output_tc + ['%-15s:%s'|format(hostvars[item].inventory_hostname,hostvars[item].ansible_facts.date_time.iso8601)] }}
+    when: ansible_play_hosts_all|list|length > 1 and hostvars[item].ansible_facts is defined and hostvars[item].ansible_facts.date_time is defined
+    run_once: true
+    delegate_to: localhost
+    with_inventory_hostnames:
+     - all
+  - name: "Reporting times"
+    debug:
+      var: output_tc
+    when: ansible_play_hosts_all|list|length > 1
+    run_once: true
+    delegate_to: localhost

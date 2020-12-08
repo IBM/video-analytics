@@ -1,6 +1,6 @@
  ***********************************************************************
  *  CUDA Runtime is not specified in configuration !!
  *  Make sure you have imported the ivatools.va-app in your playbook   *
- *  and that the version of the iva software {{ va-software.version|default('') }} is supported
+ *  and that the version of the iva software {{ va_software.version|default('') }} is supported
  *  This is configured in ivatools.va-app/vars/main.yml                *
  ***********************************************************************

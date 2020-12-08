@@ -40,7 +40,6 @@
   - set_fact:
       va_software: "{{ va_software|default({})|combine({ 'version': (archive_reg.stdout|basename).split('-')|first }) }}"
     when: va_software.version|default("") == "" and archive_reg.stdout|default("") != ""
-
   - name: "Discovering SSE software package in folder {{ software_dir }}"
     shell: >
       find {{ software_dir }} -iname "*SSE*{{ ansible_architecture }}.tgz"|grep  -v "FR"|grep -v "DEMOGRAPHICS"|grep -v "TRIAL"|sort -r

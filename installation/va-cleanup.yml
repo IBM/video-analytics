@@ -1,56 +1,51 @@
 ---
 ############################################################################
 #
-#   Uninstall IVA using ansible playbook
+#   Cleanup IVA installation files
 #
 #   Tested on 08 Dec 2020
 #
 ############################################################################
-- name: IBM Video Analytics system preparation
+- name: IBM Video Analytics Cleaning-up Installation files
   hosts: all
-#
-# community general is used for managing rhel repositories (rhsm_repository)
-#                     and ufw firewall
-# ansible.posix     is used for managing rhel firewalld
-#
-  gather_facts: yes
-  collections:
-  - ansible.posix
-  vars:
+  gather_facts: no
   tasks:
-  - debug:
-     var: ansible_become_password
   - name: "Setting ansible_become_password = ansible_password by default"
     set_fact:
       ansible_become_password: "{{ ansible_password }}"
     when: ansible_become_password is not defined
     tags: always
   
-- name: IBM Video Analytics SSE Uninstallation
+- name: IBM Video Analytics SSE Clean-up
   hosts:
   - sse
   - allinone
+  tags:
+  - sse
   gather_facts: no
   vars:
   tasks:
-  - block:
-    - include_role:
-        name: ivatools.va-app
-        tasks_from: sse-remove
+  - name: "Clean-up {{ temp_dir }}"
+    file:
+      path: "{{ temp_dir }}"
+      state: absent
+    become: yes
     tags: sse
 
 - name: IBM Video Analytics DLE Uninstallation
   hosts:
   - dle
   - allinone
+  tags:
+  - dle
   gather_facts: no
   vars:
   tasks:
-  - block:
-    - include_role:
-        name: ivatools.va-app
-        tasks_from: dle-remove.yml
-    tags: dle
+  - name: "Clean-up {{ temp_dir }}"
+    file:
+      path: "{{ temp_dir }}"
+      state: absent
+    become: yes
 
 - name: IBM Video Analytics MILS Uninstallation
   hosts:
@@ -59,9 +54,9 @@
   gather_facts: no
   vars:
   tasks:
-  - block:
-    - include_role:
-        name: ivatools.va-app
-        tasks_from: mils-remove
-    tags: mils
+  - name: "Clean-up {{ temp_dir }}"
+    file:
+      path: "{{ temp_dir }}"
+      state: absent
+    become: yes
 

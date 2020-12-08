@@ -8,4 +8,4 @@
 #   Author: Robin Mulkers
 #
 ############################################################################
-cuda_runtime_version: "{{ va_software.cuda_runtime }}"
+cuda_runtime_version: "{{ va_software.cuda_runtime|default('') }}"

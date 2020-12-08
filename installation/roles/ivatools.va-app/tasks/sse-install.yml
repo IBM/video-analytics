@@ -48,9 +48,9 @@
       msg: "DLE service: {{ topology.dle_node }}"
   - debug:
       msg: "MILS service: {{ topology.mils_node }}"
-  - name: "{{ pf }}Set dle-ip"
+  - name: "{{ pf }}Set dle-ip {{ topology.dle_node.pingOK|default(topology.dle_node.ipv4)|default(topology.dle_node.hostname)|default(topology.dle_node.inventory_ipaddr) }}"
     set_fact:
-      dle_ip: "--dle-ip={{ topology.dle_node.pingOk|default(topology.dle_node.ipv4)|default(topology.dle_node.hostname) }}"
+      dle_ip: "--dle-ip={{ topology.dle_node.pingOK|default(topology.dle_node.ipv4)|default(topology.dle_node.hostname)|default(topology.dle_node.inventory_ipaddr) }}"
     when: "topology.dle_node is defined"
   - name: "{{ pf }} ./sseconfig.sh {{ dle_ip|default('') }} vfi={{ vfi|default('no')}}"
     command:
@@ -95,7 +95,7 @@
     when: "start_output.failed and start_output.stderr is search('network_mode is incompatible with port_bindings')"
   - name: "{{ pf }}Set mils-ip"
     set_fact:
-      mils_ip: "{{ topology.mils_node.pingOk|default(topology.mils_node.ipv4)|default(topology.mils_node.hostname) }}"
+      mils_ip: "{{ topology.mils_node.pingOK|default(topology.mils_node.ipv4)|default(topology.mils_node.hostname)|default(topology.mils_node.inventory_ipaddr) }}"
   - name: "{{ pf }} ./store-credentials.sh https://{{ mils_ip }} ibmsse <default password>"
     command:
       chdir: "{{ cmd_dir }}"  
