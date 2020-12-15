@@ -9,8 +9,35 @@
 #
 ############################################################################
 - name: "[nvidia-driver.yml] starting"
-  set_fact: pf="[nvidia-driver.yml] "
+  set_fact:
+    pf: "[nvidia-driver.yml] "
+    nvidia_gpu: false
+    optimus: false
 
+- name: "{{ pf }}Checking for VGA adapters"
+  command: lshw -class display -json
+  register: display_devices
+  become: yes
+- debug:
+    msg: "{{ ' '.join(('[',display_devices.stdout|trim,']')) }}"
+    verbosity: 2
+- name: "{{ pf }}List Available Display devices"
+  debug:
+    msg: "{{ item.description|default(omit) }}, {{ item.product|default(omit) }}"
+    verbosity: 1
+  loop: "{{ ' '.join(('[',display_devices.stdout|trim,'{}]'))|from_json|list }}"
+
+- name: "{{ pf }}NVIDIA device check"
+  set_fact:
+    nvidia_gpu: true
+  when: item.vendor is defined and item.vendor|upper is search('NVIDIA')
+  loop: "{{ ' '.join(('[',display_devices.stdout|trim,'{}]'))|from_json|list }}"
+
+- name: "{{ pf }}Stopping if there is no NVIDIA device found"
+  fail:
+    msg: "FATAL ERROR: there is no NVIDIA device detected on this machine, aborting"
+  when: not nvidia_gpu
+  any_errors_fatal: true
 
 - name: "{{ pf }}nvidia-smi check"
   command: nvidia-smi
@@ -24,3 +51,15 @@
 
 - include_tasks: "nvidia-driver-{{ ansible_os_family }}.yml"
   when: nvidia_smi.rc != 0
+
+- name: "{{ pf }}NVIDIA Optimus detection"
+  set_fact:
+    optimus: true
+  when: item.vendor is defined and item.vendor|upper is not search('INTEL')
+  loop: "{{ ' '.join(('[',display_devices.stdout|trim,'{}]'))|from_json|list }}"
+
+- name: "{{ pf }}Use the Intel VGA adapter for display"
+  command: prime-select intel
+  ignore_errors: yes
+  become: yes
+

@@ -1,14 +1,14 @@
 # Video Analytics Ansible Installer
-This folder contains the ansible playbooks, allowing you to install IBM Video Analytics using ansible.
+This folder contains the ansible playbooks for installing/removing/managing the IBM Video Analytics software.
 
-Unlike the IBM provided installation scripts, this installer deploys a complete IVA system from a single control node. The Video Analytics software packages have to be downloaded once on the control node. The installer will copy these packages on the remote nodes during the installation process.
+Unlike the provided installation scripts, this installer deploys a complete IVA system from a single control node. The Video Analytics software packages have to be downloaded once on the control node. The installer will copy these packages on the remote nodes during the installation process.
 The installer will install all the pre-requisite system packages prior to the IVA deployment including the NVIDIA drivers and container runtime. It will also install useful monitoring tools like [nvtop](https://github.com/Syllo/nvtop).
-A control node could be the managed node as well if it is a single system environment but you will have to re-run manually the playbook after system restarts in order to complete the installation of the NVIDIA driver.
+A control node could be the managed node as well, an example of an inventory for a local installation is provided [here](inventories/sample-local.ini). In that case, the ansible script will stop at a certain point, you will have to reboot manually, and re-run the same playbook after the reboot in order to complete the installation of the NVIDIA driver.
 
 Control Node Requirements
 -------------------------
-* Ansible v2.9+, python3 and pip see [Ansible Documentation](https://docs.ansible.com/ansible/2.9/installation_guide/intro_installation.html#prerequisites)
-* **pip** and **netaddr** Python packages ( pip install netaddr )
+* **Ansible v2.9+**, **python3** and **pip** see [Ansible Documentation](https://docs.ansible.com/ansible/2.9/installation_guide/intro_installation.html#prerequisites)
+* **pip3** and **netaddr** Python packages ( pip3 install netaddr )
 * a folder with the downloaded IVA software
 
 Managed Node Requirements
@@ -16,7 +16,6 @@ Managed Node Requirements
 * Ubuntu 18.04-20.04 (x86_64 only) + sudo apt install net-tools openssh-server
 * RedHat 7 (x86_64 and ppc64le): the managed node operating system must be registered in order to use yum package manager
 * Python 2 or 3 must be installed on these OS but this is the case by default
-
 
 ## Inventory
 The inventory file contains the list of nodes on which the installer will deploy IVA and also some configuration parameters. Sample inventory files are provided in the inventory folder. Inventory files come in 2 flavors, ini and yml files, you just need one of those.
