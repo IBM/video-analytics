@@ -14,7 +14,8 @@
 - debug:
     msg: "{{ lookup('template', 'reportVariables.template').split('\n') }}"
 - set_fact:
-    logfilename: "{{ (ansible_date_time.iso8601_basic_short).replace('T','-')}}-{{ (inventory_file|basename).replace ('.ini','')}}-install.log"
+    logfilename: "{{ (inventory_file|basename).replace ('.ini','')}}-install.log"
+#    logfilename: "{{ (ansible_date_time.iso8601_basic_short).replace('T','-')}}-{{ (inventory_file|basename).replace ('.ini','')}}-install.log"
 - name: "{{ pf }}Logging configuration in {{ logfilename }}"
   blockinfile:
     path: "./{{ logfilename }}"

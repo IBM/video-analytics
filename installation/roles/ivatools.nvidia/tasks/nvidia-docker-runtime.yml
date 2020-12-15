@@ -11,9 +11,9 @@
 - name: "[nvidia-docker-runtime.yml] starting"
   set_fact: pf="[nvidia-docker-runtime.yml] "
 
-- name: "{{ pf }}Checking if cuda_runtime is defined in va_software"
-  block:
-  - debug:
+- block:
+  - name: "{{ pf }}Checking if cuda_runtime is defined in va_software"
+    debug:
       msg: "{{ lookup('template', 'missingCudaRuntime.txt').split('\n') }}"
     failed_when: true
   - fail:
@@ -27,8 +27,10 @@
      docker images | grep "nvidia/cuda" | grep "{{ cuda_runtime_version }}" 
   register: docker_runtime_image
   changed_when: false
+  failed_when: false
   become: yes
-  ignore_errors: yes
+- debug:
+    var: docker_runtime_image.stdout_lines
 
 - name: "{{ pf }} NVIDIA docker {{ nvidia_cuda_runtime[ ansible_architecture ].docker_image }}"
   command: >
@@ -36,9 +38,7 @@
   changed_when: false
   become: yes
   register: docker_nvidia_smi
-  ignore_errors: yes
-- debug:
-    var: docker_runtime_image.stdout_lines
+  failed_when: false
 - debug:
     var: docker_nvidia_smi.stdout_lines
     verbosity: 2
@@ -127,13 +127,6 @@
   become: yes
 - name: "{{ pf }}Ensure handlers are notified now"
   meta: flush_handlers
-
-- name: "{{ pf }}Re-starting service"
-  service:
-    state: restarted
-    name: docker
-    enabled: yes
-  become: yes
 
 - name: "{{ pf }} NVIDIA docker {{ nvidia_cuda_runtime[ ansible_architecture ].docker_image }}"
   command: >

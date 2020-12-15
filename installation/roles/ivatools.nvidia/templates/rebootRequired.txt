@@ -1,0 +1,5 @@
+ *******************************************************************************************************
+ *  A reboot of the system is required but as the connection is local, the reboot cannot be automated. *
+ *  Make sure you are rebooting the system manually and, after the reboot, you run again this same     *
+ *  ansible-playbook command as the playbook execution is not complete yet.                            *
+ *******************************************************************************************************

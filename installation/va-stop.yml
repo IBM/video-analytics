@@ -63,4 +63,17 @@
         cmd: ./stop.sh
     tags: mils
     become: yes
+
+- name: Docker Stop
+  hosts: all
+  gather_facts: no
+  tags: docker
+  tasks:
+  - name: "Stopping docker service"
+    service:
+      state: stopped
+      name: docker
+      enabled: yes
+    become: yes
+
    

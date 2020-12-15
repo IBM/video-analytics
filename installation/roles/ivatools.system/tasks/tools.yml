@@ -21,6 +21,7 @@
   package:
     name: ntfs-3g,pv,lvm2,cryptsetup,dstat,nmon,htop,iotop,arp-scan,git,curl,ca-certificates
     state: "present"
+  notify: refresh package facts
   become: yes
 
 

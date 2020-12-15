@@ -30,7 +30,12 @@
         - docker-engine
         - container.io
         - runc
+        - docker-ce
+        - docker-ce-cli
+        - containerd
+        - docker.io
       state: absent
+    notify: refresh package facts
 
   - include_tasks: "{{ docker_package }}-{{ ansible_os_family }}-{{ ansible_architecture }}.yml"
 
@@ -51,6 +56,3 @@
     name: docker
     enabled: yes
   become: yes
-
-- name: "{{ pf }}Ensure handlers are notified now"
-  meta: flush_handlers

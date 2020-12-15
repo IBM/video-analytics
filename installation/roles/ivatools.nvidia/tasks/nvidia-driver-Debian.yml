@@ -45,6 +45,11 @@
     apt:
       name: "{{ (latest_driver.stdout_lines| list | last).split('/')| first }}"
       state: present
+  - name: "{{ pf }}Notify of system reboot"
+    debug:
+      msg: "{{ lookup('template', 'rebootRequired.txt').split('\n') }}"
+    changed_when: true
+    when: ansible_connection == 'local'
   - name: "{{ pf }}Rebooting the system"
     reboot:
       reboot_timeout: 600

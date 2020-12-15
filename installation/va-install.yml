@@ -90,14 +90,10 @@
 - name: IVA System Pre-reqs Installation
   hosts: all
 #
-# community general is used for managing rhel repositories (rhsm_repository)
-#                     and ufw firewall
+# community general is used ufw firewall
 # ansible.posix     is used for managing rhel firewalld
 #
   gather_facts: no
-  collections:
-  - community.general
-  - ansible.posix
   vars:
   tasks:
 #
@@ -163,6 +159,9 @@
   hosts:
   - dle
   - allinone
+  collections:
+  - community.general
+  - ansible.posix
   vars:
   tasks:
   - block:
@@ -194,6 +193,9 @@
   hosts:
   - mils
   - allinone
+  collections:
+  - community.general
+  - ansible.posix
   vars:
   tasks:
   - block:
@@ -216,6 +218,9 @@
   hosts:
   - sse
   - allinone
+  collections:
+  - community.general
+  - ansible.posix
   tags: sse
   vars:
   tasks:

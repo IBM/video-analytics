@@ -1,0 +1,88 @@
+---
+############################################################################
+#
+#   Ansible tasks for ivatools.va-app role 
+#       used for benchmarking the IBM Video Analytics DLE
+#
+#   Tested on 11 Dec 2020
+#   Author: Robin Mulkers
+#
+############################################################################
+- name: "[dle-benchmark.yml] Bennchmarking DLE models performance"
+  set_fact:
+    pf: "[dle-benchmark.yml] "
+    docker_image: ivatools-jmeter-5.4-{{ ansible_architecture}}.tgz
+    cleaner_script: "{{ temp_dir }}/ivatools-docker-benchmark-cleanup.sh"
+    benchmark_container_name: "dle_benchmark"
+
+- block:
+  - name: "{{ pf }}Creates temporary folder on target system to store the archive file"
+    file:
+      path: "{{ temp_dir }}"
+      state: directory
+      mode: '0775'
+    failed_when: false
+  - name: "{{ pf }}Copy benchmark docker archive to {{ ansible_hostname }}:/{{ temp_dir }}"
+    copy:
+      src: "../files/{{ docker_image }}"
+      dest: "{{ temp_dir }}"
+  - name: "{{ pf }}Collect list of images before installation"
+    command:
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }}"
+    register: images_before_install
+  - name: "{{ pf }}Stopping any past docker containers"
+    command:
+      cmd: "docker stop {{ benchmark_container_name }}"
+    failed_when: false
+    when: 
+  - name: "{{ pf }}Removing any past docker containers"
+    command:
+      cmd: "docker rm {{ benchmark_container_name }}"
+    failed_when: false
+  - name: "{{ pf }}Cleaning past docker containers"
+    command:
+      cmd: "docker stop {{ benchmark_container_name }}"
+    failed_when: false
+  - name: "{{ pf }}Load docker image"
+    command:
+      cmd: docker image load -i "{{ temp_dir }}/{{ docker_image }}"
+  - name: "{{ pf }}Collect list of images after installation"
+    command:
+      cmd: docker images --format "{{ '{{' }}.ID{{ '}}' }} {{ '{{' }}.Repository{{ '}}' }} {{ '{{' }}.Tag{{ '}}' }}"
+    register: images_after_install
+  - name: "{{ pf }}Diff list of new images"
+    set_fact:
+      new_images: "{{ new_images|default([]) + [{ 'id': item.split(' ')[0], 'name': item.split(' ')[1], 'tag': item.split(' ')[2] }]}}"
+    when: item.split(' ')[0] not in images_before_install.stdout_lines
+    with_items: "{{ images_after_install.stdout_lines }}"
+  - name: "{{ pf }}Creating the cleanup script"
+    template:
+      src: ../templates/ivatools-docker-cleanup.sh
+      dest: '{{ cleaner_script }}'
+      owner: root
+      group: root
+      mode: '0755'
+    when: new_images is defined and new_images|length >0
+
+# copy 
+  - name: "{{ pf }}Remove {{ temp_dir }}/{{ docker_image }}"
+    file:
+      path: "{{ temp_dir }}/{{ docker_image }}"
+      state: absent
+  - name: "{{ pf }}Stopping docker containers"
+    command:
+      cmd: "docker stop {{ benchmark_container_name }}"
+    failed_when: false
+  - name: "{{ pf }}Removing docker containers"
+    command:
+      cmd: "docker rm {{ benchmark_container_name }}"
+    failed_when: false
+  - name: "{{ pf }}Removing docker images"
+    command:
+      cmd: "{{ cleaner_script }}"
+  - name: "{{ pf }}Remove {{ cleaner_script }}"
+    file:
+      path: "{{ cleaner_script }}"
+      state: absent
+  
+  become: yes

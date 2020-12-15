@@ -14,3 +14,20 @@ docker_apt_gpg_key: 'https://download.docker.com/linux/ubuntu/gpg'
 docker_apt_finger_print: '0EBFCD88'
 docker_apt_repository: 'deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable'
 docker_compose_bin: '/usr/local/bin/docker-compose'
+
+docker-ppc64le-binaries:
+  RedHat:
+    web_url: 'https://oplab9.parqtec.unicamp.br/pub/ppc64el/docker/version-19.03.8/centos/'
+    bin-packages:
+      - "docker-ce-19.03.13-3.el{{ dist_major }}.ppc64le.rpm"
+      - "docker-ce-cli-19.03.13-3.el{{ dist_major }}.ppc64le.rpm"
+  CentOS:
+    web_url: 'https://oplab9.parqtec.unicamp.br/pub/ppc64el/docker/version-19.03.8/centos/'
+    bin-packages:
+      - "docker-ce-19.03.13-3.el{{ dist_major }}.ppc64le.rpm"
+      - "docker-ce-cli-19.03.13-3.el{{ dist_major }}.ppc64le.rpm"
+  Ubuntu:
+    web_url: 'https://oplab9.parqtec.unicamp.br/pub/ppc64el/docker/version-19.03.8/ubuntu-{{ ansible_distribution_release }}/'
+    bin-packages:
+      - "docker-ce_19.03.8~3-0~ubuntu-{{ ansible_distribution_release }}_ppc64el.deb"
+      - "docker-ce-cli_19.03.8~3-0~ubuntu-{{ ansible_distribution_release }}_ppc64el.deb"

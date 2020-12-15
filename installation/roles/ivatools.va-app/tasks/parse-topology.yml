@@ -128,9 +128,9 @@
             'ipv6': (ansible_facts.ipv6|default(ansible_facts.default_ipv6))['address']|default(omit), 
             'hostname': ansible_facts.fqdn|default(ansible_facts.hostname),
             'inventory_ipaddr': inventory_hostname|ipaddr|ternary(inventory_hostname|ipaddr,omit,omit),
-            'mils': inventory_hostname is in groups['mils']|bool,
-            'sse': inventory_hostname is in groups['sse']|bool,
-            'dle': inventory_hostname is in groups['dle']|bool
+            'mils': inventory_hostname in (groups['mils']|default([])|list),
+            'sse': inventory_hostname in (groups['sse']|default([])|list),
+            'dle': inventory_hostname in (groups['dle']|default([])|list)
            } ) }}
   - name: "{{ pf }}Set mils_node to itself when MILS and SSE are colocated"
     set_fact:
@@ -293,7 +293,7 @@
          {{ topology|combine ({ 'dle_node': { 'hostname': ansible_facts.fqdn|default(ansible_facts.hostname)},
             'mils_node': { 'hostname': ansible_facts.fqdn|default(ansible_facts.hostname)} ,
             'mils': true, 'sse': true, 'dle':true }) }}
-    when: 'inventory_hostname is in groups[ "allinone"]' 
+    when: 'inventory_hostname in groups.allinone' 
   - name: "{{ pf }}Reporting Topology"
     debug:
      var: topology

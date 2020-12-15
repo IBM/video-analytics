@@ -19,3 +19,5 @@
 
 - include_tasks: "nvtop.yml"
 
+- name: "Ensure handlers are notified now"
+  meta: flush_handlers

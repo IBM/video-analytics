@@ -8,3 +8,6 @@
 #   Author: Robin Mulkers
 #
 ############################################################################
+- name: refresh package facts
+  package_facts:
+    manager: auto

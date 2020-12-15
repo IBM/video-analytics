@@ -30,6 +30,8 @@
     package:
       name: rh-python36,libffi-devel,openssl-devel,rh-python36-python-pip
       state: "present"
+    notify: refresh package facts
+
   - name: "{{ pf }}Linking python3 on Power"
     file:
       src: '{{ python3_install_folder }}/python3'
@@ -51,6 +53,7 @@
   package:
     name: python3,python3-pip
     state: "present"
+  notify: refresh package facts
   when: >
       ( ansible_distribution is not search("RedHat") or ansible_architecture == 'x86_64' ) and
       ( check_python3.rc != 0 or check_pip3.rc != 0 )

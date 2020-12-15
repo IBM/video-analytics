@@ -21,34 +21,14 @@
 
 # https://developer.ibm.com/components/ibm-power/tutorials/install-docker-on-linux-on-power/
 
-- name: "{{ pf }}Install container.d on EL7"
+- name: "{{ pf }}Install container.d on Ubuntu"
   package:
     name: containerd
     state: present
-  when: ansible_distribution_major_version | int == 7
   become: yes
-- block:
-    - name: "{{ pf }}Ensure container-selinux is installed"
-      package:
-        name: container-selinux
-        state: present
-
-    - name: "{{ pf }}Disable container-tools module"
-      command: dnf -y module disable container-tools
-      changed_when: false
-
-    - name: "{{ pf }}Ensure containerd.io is installed"
-      package:
-        name: containerd.io
-        state: present
-  when: ansible_distribution_major_version | int == 8
-  become: yes
-
-# https://developer.ibm.com/components/ibm-power/tutorials/install-docker-on-linux-on-power/
 
 - name: "{{ pf }}Installing docker-ce packages"
-  yum:
-    name: "{{ docker-ppc64le-binaries[ ansible_distribution ].web_url }}{{ item }}"
-    state: present
+  apt:
+    deb: "{{ docker-ppc64le-binaries[ ansible_distribution ].web_url }}{{ item }}"
   loop: "{{ docker-ppc64le-binaries[ ansible_distribution ].bin-packages }}"
   become: yes

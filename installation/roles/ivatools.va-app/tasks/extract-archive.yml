@@ -9,9 +9,10 @@
 #
 ############################################################################
 - name: "[extract-archive.yml] Selecting, Transfering and Extracting {{ component | upper }} archive"
-  set_fact: pf1="[extract-archive.yml]({{ component }}) "
-- name: "Naming SHA1 signature file"
-  set_fact: sha1filename="{{ software_dir }}/sha1sum.txt"
+  set_fact:
+    pf1: "[extract-archive.yml]({{ component }}) "
+    sha1filename: "{{ software_dir }}/sha1sum.txt"
+    sha1value: ""
 
 #
 # Finding the latest archive
@@ -50,7 +51,7 @@
       get_checksum: yes
       path: "{{ archive }}"
     register: new_sha1
-    when: sha1value is not defined
+    when: sha1value is not defined or sha1value|length == 0
   - name: "{{ pf1 }}Add new sha1 signature to  {{ sha1filename }}"
     lineinfile:
       path: "{{ sha1filename }}"
@@ -63,6 +64,7 @@
     set_fact:
       sha1value: "{{ new_sha1.stat.checksum }}"
     when: new_sha1.stat is defined
+  when: ansible_connection != 'local'
   delegate_to: 'localhost'
   throttle: 1
 ##########################################################################################
@@ -76,23 +78,26 @@
     mode: '0775'
   failed_when: false
 
-- name: "{{ pf1 }}Copy {{ sha1filename }} on {{ ansible_hostname }}:/{{ temp_dir }}"
-  copy:
-    src: "{{ sha1filename }}"
-    dest: "{{ temp_dir }}"
-- name: "{{ pf1 }}Check signature of existing file before copy"
-  stat:
-    path: "{{ temp_dir }}/{{ archive|basename }}"
-    checksum_algorithm: sha1
-    get_checksum: yes
-  register: remote_archive
-  failed_when: false
-- name: "{{ pf1 }}Copy {{ archive }} on {{ ansible_hostname }}:/{{ temp_dir }}"
-  copy:
-    src: "{{ archive }}"
-    dest: "{{ temp_dir }}"
-    checksum: "{{ sha1value }}"
-  when: remote_archive.stat.checksum|default('') != sha1value
+- block:
+  - name: "{{ pf1 }}Copy {{ sha1filename }} on {{ ansible_hostname }}:/{{ temp_dir }}"
+    copy:
+      src: "{{ sha1filename }}"
+      dest: "{{ temp_dir }}"
+  - name: "{{ pf1 }}Check signature of existing file before copy"
+    stat:
+      path: "{{ temp_dir }}/{{ archive|basename }}"
+      checksum_algorithm: sha1
+      get_checksum: yes
+    register: remote_archive
+    failed_when: false
+  - name: "{{ pf1 }}Copy {{ archive }} on {{ ansible_hostname }}:/{{ temp_dir }}"
+    copy:
+      src: "{{ archive }}"
+      dest: "{{ temp_dir }}"
+      checksum: "{{ sha1value }}"
+    when: remote_archive.stat.checksum|default('') != sha1value
+  when: ansible_connection != 'local'
+
   
 #
 # Extracting the archive extract folder is watvid_dir for SSE and DLE but not for MILS
@@ -111,5 +116,15 @@
     group: root
     owner: root
     remote_src: yes
+  when: ansible_connection != 'local'
+  become: yes
+- name: "{{ pf1 }}Extract the archive {{ archive }} to {{ extract_dir }}"
+  unarchive:
+    src: "{{ archive }}"
+    dest: "{{ extract_dir }}"
+    group: root
+    owner: root
+    remote_src: yes
+  when: ansible_connection == 'local'
   become: yes
 
