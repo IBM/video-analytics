@@ -10,10 +10,10 @@
 ############################################################################
 # NVIDIA driver and nvidia-docker
 dist_major_minor: '{{ ansible_distribution | lower | replace("redhat","rhel")}}{{ ansible_distribution_version }}'
-dist_majorminor: '{{ dist_major_minor |replace(".","")}}'
+dist_majorminor: '{{ dist_major_minor |replace(".","") }}'
 dist_major: '{{ ansible_distribution | lower | replace("redhat","rhel") }}{{ ansible_distribution_major_version }}'
 driver_repo_url_template: 'http://developer.download.nvidia.com/compute/cuda/repos/REPO/{{ ansible_architecture }}'
-nvidia_docker_repo_url_template: 'https://nvidia.github.io/nvidia-container-runtime/REPO'
+nvidia_docker_repo_url_template: 'https://nvidia.github.io/nvidia-docker/REPO'
 
 nvidia_repos:
   RedHat:
